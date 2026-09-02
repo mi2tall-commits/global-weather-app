@@ -9,7 +9,6 @@ class WeatherApp {
     this.forecastData = null;
     this.airQualityData = null;
     this.hourlyInterval = 1; // 1 or 3
-    this.selectedDayIndex = 0; // 0 = today
     this.searchDebounceTimer = null;
 
     this.initElements();
@@ -30,6 +29,32 @@ class WeatherApp {
       loadingOverlay: document.getElementById('loadingOverlay'),
       offlineNotice: document.getElementById('offlineNotice'),
 
+      // Current Weather
+      currentTemp: document.getElementById('currentTemp'),
+      currentDesc: document.getElementById('currentDesc'),
+      currentIcon: document.getElementById('currentIcon'),
+      currentApparent: document.getElementById('currentApparent'),
+      currentHumidity: document.getElementById('currentHumidity'),
+      currentWind: document.getElementById('currentWind'),
+      pm10Badge: document.getElementById('pm10Badge'),
+      pm25Badge: document.getElementById('pm25Badge'),
+      todayHighLow: document.getElementById('todayHighLow'),
+      updateTime: document.getElementById('updateTime'),
+
+      // Consensus & Alerts
+      consensusCard: document.getElementById('consensusCard'),
+      consensusText: document.getElementById('consensusText'),
+      consensusBadge: document.getElementById('consensusBadge'),
+      severeAlertBanner: document.getElementById('severeAlertBanner'),
+
+      // Hourly Timeline
+      interval1hBtn: document.getElementById('interval1hBtn'),
+      interval3hBtn: document.getElementById('interval3hBtn'),
+      hourlyTimelineContainer: document.getElementById('hourlyTimelineContainer'),
+
+      // Vertical Weekly List
+      verticalWeeklyList: document.getElementById('verticalWeeklyList'),
+
       // Gemini AI Elements
       geminiSettingsBtn: document.getElementById('geminiSettingsBtn'),
       geminiModal: document.getElementById('geminiModal'),
@@ -43,38 +68,6 @@ class WeatherApp {
       geminiChatInput: document.getElementById('geminiChatInput'),
       geminiChatSendBtn: document.getElementById('geminiChatSendBtn'),
       geminiChatMessages: document.getElementById('geminiChatMessages'),
-
-      // Consensus & Alerts
-      consensusCard: document.getElementById('consensusCard'),
-      consensusText: document.getElementById('consensusText'),
-      consensusBadge: document.getElementById('consensusBadge'),
-      severeAlertBanner: document.getElementById('severeAlertBanner'),
-
-      // Current Weather
-      currentTemp: document.getElementById('currentTemp'),
-      currentDesc: document.getElementById('currentDesc'),
-      currentIcon: document.getElementById('currentIcon'),
-      currentApparent: document.getElementById('currentApparent'),
-      currentHumidity: document.getElementById('currentHumidity'),
-      currentWind: document.getElementById('currentWind'),
-      currentPrecip: document.getElementById('currentPrecip'),
-      currentPressure: document.getElementById('currentPressure'),
-      updateTime: document.getElementById('updateTime'),
-
-      // Lifestyle & Air Quality Cards
-      umbrellaCard: document.getElementById('umbrellaCard'),
-      outfitCard: document.getElementById('outfitCard'),
-      carwashCard: document.getElementById('carwashCard'),
-      outdoorCard: document.getElementById('outdoorCard'),
-      airQualityCard: document.getElementById('airQualityCard'),
-
-      // Hourly Timeline
-      interval1hBtn: document.getElementById('interval1hBtn'),
-      interval3hBtn: document.getElementById('interval3hBtn'),
-      hourlyTimelineContainer: document.getElementById('hourlyTimelineContainer'),
-
-      // Daily Forecast
-      dailyCardsContainer: document.getElementById('dailyCardsContainer'),
     };
   }
 
@@ -123,7 +116,7 @@ class WeatherApp {
   initServiceWorker() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js')
-        .then(() => console.log('Service Worker 등록 완료 (오프라인 캐싱 활성화)'))
+        .then(() => console.log('Service Worker 등록 완료'))
         .catch((err) => console.warn('Service Worker 등록 실패:', err));
     }
   }
@@ -148,7 +141,7 @@ class WeatherApp {
     this.renderFavorites();
     this.updateGeminiKeyStatus();
 
-    // 1. Instant Location Detection
+    // 1. Instant Location (Fast IP or Cache)
     const initialLoc = await GeoService.getInitialLocation();
     this.currentLocation = initialLoc;
 
@@ -183,7 +176,7 @@ class WeatherApp {
       localStorage.setItem('last_user_location', JSON.stringify(loc));
       await this.loadWeather(coords.latitude, coords.longitude, geoInfo.name, geoInfo.country);
     } catch (err) {
-      console.warn('GPS 핸들러 예외:', err);
+      console.warn('GPS 오류:', err);
     } finally {
       this.showLoading(false);
     }
@@ -195,20 +188,20 @@ class WeatherApp {
 
     if (!results || results.length === 0) {
       this.elements.searchResults.innerHTML = `
-        <div class="p-3 text-sm text-slate-400 text-center">검색 결과가 없습니다.</div>
+        <div class="p-3 text-xs text-slate-400 text-center">검색 결과가 없습니다.</div>
       `;
       this.elements.searchResults.classList.remove('hidden');
       return;
     }
 
     this.elements.searchResults.innerHTML = results.map(r => `
-      <div class="p-3 hover:bg-white/10 cursor-pointer border-b border-white/5 last:border-0 flex items-center justify-between text-left transition"
+      <div class="p-2.5 hover:bg-white/10 cursor-pointer border-b border-white/5 last:border-0 flex items-center justify-between text-left transition"
            data-lat="${r.latitude}" data-lon="${r.longitude}" data-name="${r.name}" data-country="${r.country || ''}" data-admin="${r.admin1 || ''}">
         <div>
-          <div class="font-medium text-white">${r.name}</div>
-          <div class="text-xs text-slate-400">${[r.admin1, r.country].filter(Boolean).join(', ')}</div>
+          <div class="font-medium text-white text-xs sm:text-sm">${r.name}</div>
+          <div class="text-[11px] text-slate-400">${[r.admin1, r.country].filter(Boolean).join(', ')}</div>
         </div>
-        <span class="text-xs text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded">선택</span>
+        <span class="text-[11px] text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">선택</span>
       </div>
     `).join('');
 
@@ -251,11 +244,10 @@ class WeatherApp {
       this.forecastData = EnsembleEngine.synthesizeForecast(forecastRaw);
       this.airQualityData = airQualityRaw;
 
-      // Offline banner notice
       if (this.elements.offlineNotice) {
         if (this.forecastData._isCached) {
           const cachedTimeStr = this.forecastData._cachedAt ? new Date(this.forecastData._cachedAt).toLocaleTimeString('ko-KR') : '';
-          this.elements.offlineNotice.innerHTML = `📡 <b>오프라인 캐시 모드:</b> 최근 저장된 예보(${cachedTimeStr})를 표시하고 있습니다.`;
+          this.elements.offlineNotice.innerHTML = `📡 <b>오프라인 모드:</b> 최근 저장된 예보(${cachedTimeStr})를 표시하고 있습니다.`;
           this.elements.offlineNotice.classList.remove('hidden');
         } else {
           this.elements.offlineNotice.classList.add('hidden');
@@ -264,7 +256,7 @@ class WeatherApp {
 
       this.renderAll();
     } catch (err) {
-      console.error('날씨 데이터 로드 실패:', err);
+      console.error('날씨 로드 실패:', err);
     } finally {
       this.showLoading(false);
     }
@@ -273,23 +265,52 @@ class WeatherApp {
   renderAll() {
     this.renderCurrentWeather();
     this.renderConsensusAndAlerts();
-    this.renderLifestyleIndices();
     this.renderHourlyTimeline();
-    this.renderDailyForecast();
+    this.renderVerticalWeeklyList();
     this.updateFavButtonState();
   }
 
   renderCurrentWeather() {
     if (!this.forecastData?.current) return;
     const cur = this.forecastData.current;
+    const today = this.forecastData.dailyItems?.[0];
+
     if (this.elements.currentTemp) this.elements.currentTemp.textContent = `${cur.temp}°`;
     if (this.elements.currentDesc) this.elements.currentDesc.textContent = cur.weatherDesc;
     if (this.elements.currentIcon) this.elements.currentIcon.textContent = cur.weatherIcon;
-    if (this.elements.currentApparent) this.elements.currentApparent.textContent = `${cur.apparentTemp}°C`;
+    if (this.elements.currentApparent) this.elements.currentApparent.textContent = `체감 ${cur.apparentTemp}°C`;
     if (this.elements.currentHumidity) this.elements.currentHumidity.textContent = `${cur.humidity}%`;
-    if (this.elements.currentWind) this.elements.currentWind.textContent = `${cur.windSpeed} km/h (순간 ${cur.windGusts})`;
-    if (this.elements.currentPrecip) this.elements.currentPrecip.textContent = `${cur.precip} mm`;
-    if (this.elements.currentPressure) this.elements.currentPressure.textContent = `${cur.pressure} hPa`;
+    if (this.elements.currentWind) this.elements.currentWind.textContent = `${cur.windSpeed}km/h`;
+
+    if (this.elements.todayHighLow && today) {
+      this.elements.todayHighLow.textContent = `최고 ${today.maxTemp}° / 최저 ${today.minTemp}°`;
+    }
+
+    // PM10 / PM2.5 Badges
+    if (this.airQualityData?.current) {
+      const pm10 = Math.round(this.airQualityData.current.pm10 || 0);
+      const pm25 = Math.round(this.airQualityData.current.pm2_5 || 0);
+
+      if (this.elements.pm10Badge) {
+        let pm10Text = '좋음 🟢';
+        let pm10Color = 'text-emerald-400';
+        if (pm10 > 150) { pm10Text = '매우나쁨 🔴'; pm10Color = 'text-rose-400'; }
+        else if (pm10 > 80) { pm10Text = '나쁨 🟡'; pm10Color = 'text-amber-400'; }
+        else if (pm10 > 30) { pm10Text = '보통 🔵'; pm10Color = 'text-blue-400'; }
+        this.elements.pm10Badge.textContent = `${pm10Text} (${pm10})`;
+        this.elements.pm10Badge.className = `font-bold ${pm10Color}`;
+      }
+
+      if (this.elements.pm25Badge) {
+        let pm25Text = '좋음 🟢';
+        let pm25Color = 'text-emerald-400';
+        if (pm25 > 75) { pm25Text = '매우나쁨 🔴'; pm25Color = 'text-rose-400'; }
+        else if (pm25 > 35) { pm25Text = '나쁨 🟡'; pm25Color = 'text-amber-400'; }
+        else if (pm25 > 15) { pm25Text = '보통 🔵'; pm25Color = 'text-blue-400'; }
+        this.elements.pm25Badge.textContent = `${pm25Text} (${pm25})`;
+        this.elements.pm25Badge.className = `font-bold ${pm25Color}`;
+      }
+    }
 
     const now = new Date();
     if (this.elements.updateTime) {
@@ -302,8 +323,8 @@ class WeatherApp {
     const insight = this.forecastData.consensusInsight;
     if (this.elements.consensusText) this.elements.consensusText.textContent = insight.summaryText;
     if (this.elements.consensusBadge) {
-      this.elements.consensusBadge.className = `text-xs px-2.5 py-1 rounded-full font-medium border ${insight.agreementBadge}`;
-      this.elements.consensusBadge.textContent = `글로벌 모델 일치도: ${insight.agreementLevel}`;
+      this.elements.consensusBadge.className = `text-[10px] px-2 py-0.5 rounded-full font-semibold border ${insight.agreementBadge}`;
+      this.elements.consensusBadge.textContent = `일치도: ${insight.agreementLevel}`;
     }
 
     const next24 = this.forecastData.timeline.slice(0, 24);
@@ -314,18 +335,18 @@ class WeatherApp {
 
     const alerts = [];
     if (maxPrecip >= 20 || insight.totalPrecip24h >= 40) {
-      alerts.push('⚠️ [호우 주의보] 24시간 내 강한 집중 호우가 예상됩니다. 침수 및 안전사고에 유의하세요.');
+      alerts.push('⚠️ [호우 주의보] 24시간 내 강한 집중 호우가 예상됩니다. 안전에 유의하세요.');
     } else if (maxWind >= 50) {
-      alerts.push('💨 [강풍 주의보] 순간 최대 풍속 50km/h 이상의 강한 바람이 불겠습니다. 시설물 관리에 주의하세요.');
+      alerts.push('💨 [강풍 주의보] 순간 최대 풍속 50km/h 이상의 강한 바람에 주의하세요.');
     } else if (maxTemp >= 33) {
-      alerts.push('🔥 [폭염 주의] 낮 최고기온 33°C 이상의 무더위가 예상됩니다. 충분한 수분을 섭취하세요.');
+      alerts.push('🔥 [폭염 주의] 낮 최고기온 33°C 이상의 무더위에 유의하세요.');
     } else if (minTemp <= -10) {
-      alerts.push('❄️ [한파 주의] 최저기온 영하 10°C 이하의 강추위가 예상됩니다. 동파 예방에 유의하세요.');
+      alerts.push('❄️ [한파 주의] 영하 10°C 이하의 강추위 및 동파 예방에 유의하세요.');
     }
 
     if (this.elements.severeAlertBanner) {
       if (alerts.length > 0) {
-        this.elements.severeAlertBanner.innerHTML = alerts.map(a => `<div class="p-3 bg-amber-500/20 border border-amber-500/40 text-amber-200 rounded-xl text-sm font-medium mb-2">${a}</div>`).join('');
+        this.elements.severeAlertBanner.innerHTML = alerts.map(a => `<div class="p-3 bg-amber-500/20 border border-amber-500/40 text-amber-200 rounded-2xl text-xs font-medium">${a}</div>`).join('');
         this.elements.severeAlertBanner.classList.remove('hidden');
       } else {
         this.elements.severeAlertBanner.classList.add('hidden');
@@ -334,131 +355,15 @@ class WeatherApp {
     }
   }
 
-  renderLifestyleIndices() {
-    if (!this.forecastData?.timeline) return;
-    const next24 = this.forecastData.timeline.slice(0, 24);
-    const maxPop = Math.max(...next24.map(h => h.pop));
-    const totalRain = next24.reduce((sum, h) => sum + h.precip, 0);
-    const avgTemp = Math.round(next24.reduce((sum, h) => sum + h.temp, 0) / next24.length);
-
-    // 1. Umbrella
-    let umbrellaText = '우산 필요 없음 (맑음)';
-    let umbrellaIcon = '🌂';
-    let umbrellaColor = 'text-emerald-400';
-    if (maxPop >= 70 || totalRain >= 5) {
-      umbrellaText = '우산 필수 지참 (비/소나기)';
-      umbrellaIcon = '☔';
-      umbrellaColor = 'text-rose-400';
-    } else if (maxPop >= 40 || totalRain > 0.5) {
-      umbrellaText = '접이식 우산 추천 (강수확률 ' + maxPop + '%)';
-      umbrellaIcon = '🌂';
-      umbrellaColor = 'text-amber-400';
-    }
-    if (this.elements.umbrellaCard) {
-      this.elements.umbrellaCard.innerHTML = `
-        <div class="flex items-center justify-between mb-1">
-          <span class="text-xs text-slate-400">우산 지수</span>
-          <span class="text-xl">${umbrellaIcon}</span>
-        </div>
-        <div class="font-semibold text-sm ${umbrellaColor}">${umbrellaText}</div>
-      `;
-    }
-
-    // 2. Outfit Recommendation
-    let outfitText = '';
-    let outfitIcon = '👕';
-    if (avgTemp >= 28) outfitText = '민소매, 반팔, 린넨 옷차림';
-    else if (avgTemp >= 23) outfitText = '반팔, 얇은 셔츠, 반바지';
-    else if (avgTemp >= 20) outfitText = '얇은 가디건, 긴팔티, 슬랙스';
-    else if (avgTemp >= 17) outfitText = '자켓, 셔츠, 니트, 면바지';
-    else if (avgTemp >= 12) outfitText = '가죽자켓, 트렌치코트, 니트';
-    else if (avgTemp >= 9) outfitText = '코트, 점퍼, 기모바지';
-    else if (avgTemp >= 5) outfitText = '울코트, 가죽옷, 발열내의';
-    else { outfitText = '패딩, 두꺼운 코트, 목도리/장갑'; outfitIcon = '🧥'; }
-
-    if (this.elements.outfitCard) {
-      this.elements.outfitCard.innerHTML = `
-        <div class="flex items-center justify-between mb-1">
-          <span class="text-xs text-slate-400">옷차림 추천 (${avgTemp}°C)</span>
-          <span class="text-xl">${outfitIcon}</span>
-        </div>
-        <div class="font-semibold text-sm text-indigo-200">${outfitText}</div>
-      `;
-    }
-
-    // 3. Carwash & Laundry
-    let carwashText = '세차 적합 (3일간 비 없음)';
-    let carwashColor = 'text-emerald-400';
-    const next3DaysRain = this.forecastData.dailyItems.slice(0, 3).some(d => d.maxPop >= 40 || d.precipSum > 1);
-    if (next3DaysRain) {
-      carwashText = '세차 보류 권장 (비 예보)';
-      carwashColor = 'text-rose-400';
-    }
-    if (this.elements.carwashCard) {
-      this.elements.carwashCard.innerHTML = `
-        <div class="flex items-center justify-between mb-1">
-          <span class="text-xs text-slate-400">세차 / 빨래 지수</span>
-          <span class="text-xl">🚗</span>
-        </div>
-        <div class="font-semibold text-sm ${carwashColor}">${carwashText}</div>
-      `;
-    }
-
-    // 4. Outdoor Running
-    const maxWind = Math.max(...next24.map(h => h.windSpeed));
-    let outdoorText = '야외 운동 매우 좋음';
-    let outdoorColor = 'text-emerald-400';
-    if (totalRain > 2 || maxWind > 35) {
-      outdoorText = '실내 운동 권장 (비/강풍)';
-      outdoorColor = 'text-rose-400';
-    } else if (avgTemp >= 30) {
-      outdoorText = '야간 운동 권장 (폭염)';
-      outdoorColor = 'text-amber-400';
-    }
-    if (this.elements.outdoorCard) {
-      this.elements.outdoorCard.innerHTML = `
-        <div class="flex items-center justify-between mb-1">
-          <span class="text-xs text-slate-400">야외 활동 지수</span>
-          <span class="text-xl">🏃</span>
-        </div>
-        <div class="font-semibold text-sm ${outdoorColor}">${outdoorText}</div>
-      `;
-    }
-
-    // 5. Air Quality & UV
-    let aqiText = '대기질 연동 중';
-    let aqiColor = 'text-slate-300';
-    if (this.airQualityData && this.airQualityData.current) {
-      const pm10 = Math.round(this.airQualityData.current.pm10 || 0);
-      const pm25 = Math.round(this.airQualityData.current.pm2_5 || 0);
-      let grade = '좋음 🟢';
-      aqiColor = 'text-emerald-400';
-      if (pm25 > 75 || pm10 > 150) { grade = '매우 나쁨 🔴'; aqiColor = 'text-rose-400'; }
-      else if (pm25 > 35 || pm10 > 80) { grade = '나쁨 🟡'; aqiColor = 'text-amber-400'; }
-      else if (pm25 > 15 || pm10 > 30) { grade = '보통 🔵'; aqiColor = 'text-blue-400'; }
-
-      aqiText = `미세 ${pm10}㎍ / 초미세 ${pm25}㎍ (${grade})`;
-    }
-    if (this.elements.airQualityCard) {
-      this.elements.airQualityCard.innerHTML = `
-        <div class="flex items-center justify-between mb-1">
-          <span class="text-xs text-slate-400">미세먼지 / 대기질</span>
-          <span class="text-xl">🍃</span>
-        </div>
-        <div class="font-semibold text-sm ${aqiColor}">${aqiText}</div>
-      `;
-    }
-  }
-
   setInterval(interval) {
     this.hourlyInterval = interval;
     if (this.elements.interval1hBtn && this.elements.interval3hBtn) {
       if (interval === 1) {
-        this.elements.interval1hBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow cursor-pointer';
-        this.elements.interval3hBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white cursor-pointer';
+        this.elements.interval1hBtn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-indigo-600 text-white shadow cursor-pointer';
+        this.elements.interval3hBtn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-medium text-slate-400 hover:text-white cursor-pointer';
       } else {
-        this.elements.interval3hBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow cursor-pointer';
-        this.elements.interval1hBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white cursor-pointer';
+        this.elements.interval3hBtn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-indigo-600 text-white shadow cursor-pointer';
+        this.elements.interval1hBtn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-medium text-slate-400 hover:text-white cursor-pointer';
       }
     }
     this.renderHourlyTimeline();
@@ -466,92 +371,103 @@ class WeatherApp {
 
   renderHourlyTimeline() {
     if (!this.elements.hourlyTimelineContainer || !this.forecastData) return;
-    const selectedDate = this.forecastData.dailyItems[this.selectedDayIndex].date;
-    const dayHours = this.forecastData.timeline.filter(h => h.date === selectedDate);
+    const hours = this.forecastData.timeline.slice(0, 36); // next 36 hours
     const step = this.hourlyInterval;
-    const filteredHours = dayHours.filter((_, idx) => idx % step === 0);
+    const filteredHours = hours.filter((_, idx) => idx % step === 0);
 
-    this.elements.hourlyTimelineContainer.innerHTML = filteredHours.map(h => {
+    this.elements.hourlyTimelineContainer.innerHTML = filteredHours.map((h, i) => {
       const popBadgeColor = h.pop >= 60 ? 'text-cyan-400 font-bold' : h.pop >= 30 ? 'text-cyan-300' : 'text-slate-500';
-      const precipHeight = Math.min(Math.max(h.precip * 6, h.pop > 20 ? 4 : 0), 40);
+      const precipHeight = Math.min(Math.max(h.precip * 6, h.pop > 20 ? 4 : 0), 32);
+      const isNow = i === 0;
 
       return `
-        <div class="flex-shrink-0 flex flex-col items-center justify-between p-3 rounded-xl glass-card w-24 text-center transition hover:scale-105">
-          <span class="text-xs font-medium text-slate-400">${h.hour}:00</span>
-          <span class="text-2xl my-2" title="${h.weatherDesc}">${h.weatherIcon}</span>
-          <span class="text-base font-bold text-white mb-1">${h.temp}°</span>
+        <div class="flex-shrink-0 flex flex-col items-center justify-between p-2.5 rounded-2xl weather-subcard w-20 text-center transition hover:bg-white/10">
+          <span class="text-[11px] font-medium ${isNow ? 'text-indigo-400 font-bold' : 'text-slate-400'}">
+            ${isNow ? '지금' : h.hour + '시'}
+          </span>
+          <span class="text-2xl my-1.5" title="${h.weatherDesc}">${h.weatherIcon}</span>
+          <span class="text-sm font-bold text-white mb-1">${h.temp}°</span>
           
-          <div class="w-full flex flex-col items-center mt-2 pt-2 border-t border-white/5">
-            <span class="text-xs ${popBadgeColor}">💧 ${h.pop}%</span>
-            <div class="w-full h-8 flex items-end justify-center my-1 bg-black/20 rounded">
-              <div class="w-4 bg-gradient-to-t from-cyan-600 to-blue-400 rounded-t precip-bar" style="height: ${precipHeight}px;"></div>
+          <div class="w-full flex flex-col items-center mt-1 pt-1.5 border-t border-white/5">
+            <span class="text-[10px] ${popBadgeColor}">💧 ${h.pop}%</span>
+            <div class="w-full h-7 flex items-end justify-center my-0.5 bg-black/20 rounded">
+              <div class="w-3 bg-gradient-to-t from-cyan-600 to-blue-400 rounded-t precip-bar" style="height: ${precipHeight}px;"></div>
             </div>
-            <span class="text-[10px] text-slate-400 font-mono">${h.precip > 0 ? h.precip + 'mm' : '-'}</span>
-          </div>
-
-          <div class="mt-2 text-[10px] text-slate-400">
-            💨 ${h.windSpeed}km/h
+            <span class="text-[9px] text-slate-400 font-mono">${h.precip > 0 ? h.precip + 'mm' : '-'}</span>
           </div>
         </div>
       `;
     }).join('');
   }
 
-  renderDailyForecast() {
-    if (!this.elements.dailyCardsContainer || !this.forecastData) return;
+  /**
+   * 날씨날씨 시그니처: 세로형 주간/일별 예보 리스트 렌더링
+   */
+  renderVerticalWeeklyList() {
+    if (!this.elements.verticalWeeklyList || !this.forecastData) return;
     const days = this.forecastData.dailyItems;
-    this.elements.dailyCardsContainer.innerHTML = days.map((day, idx) => {
-      const isSelected = idx === this.selectedDayIndex;
-      const selectClass = isSelected
-        ? 'ring-2 ring-indigo-500 bg-indigo-950/60 border-indigo-400/40 shadow-lg scale-102'
-        : 'glass-card hover:bg-white/10';
+
+    // Find min and max temp across all 16 days to normalize the bar
+    const allMin = Math.min(...days.map(d => d.minTemp));
+    const allMax = Math.max(...days.map(d => d.maxTemp));
+    const tempRange = Math.max(allMax - allMin, 1);
+
+    this.elements.verticalWeeklyList.innerHTML = days.map((day, idx) => {
+      let dayLabel = `${day.date.substring(5)} (${day.dayOfWeek})`;
+      let dayClass = 'text-slate-200';
+      if (idx === 0) { dayLabel = '오늘'; dayClass = 'text-indigo-400 font-bold'; }
+      else if (idx === 1) { dayLabel = '내일'; dayClass = 'text-white font-medium'; }
+      else if (idx === 2) { dayLabel = '모레'; dayClass = 'text-white font-medium'; }
 
       const popColor = day.maxPop >= 60 ? 'text-cyan-400 font-bold' : day.maxPop >= 30 ? 'text-cyan-300' : 'text-slate-500';
 
+      // Bar position calculation
+      const leftPercent = ((day.minTemp - allMin) / tempRange) * 100;
+      const widthPercent = Math.max(((day.maxTemp - day.minTemp) / tempRange) * 100, 10);
+
       return `
-        <div class="flex-shrink-0 cursor-pointer p-4 rounded-2xl flex flex-col items-center justify-between w-32 text-center transition ${selectClass}" data-day-index="${idx}">
-          <div class="text-xs font-semibold ${day.isToday ? 'text-indigo-400' : 'text-slate-300'}">
-            ${day.isToday ? '오늘' : `${day.date.substring(5)} (${day.dayOfWeek})`}
-          </div>
-          <div class="text-3xl my-2">${day.weatherIcon}</div>
-          <div class="text-xs text-slate-300 mb-1 font-medium">${day.weatherDesc}</div>
-          
-          <div class="flex items-center gap-1.5 text-sm my-1">
-            <span class="font-bold text-white">${day.maxTemp}°</span>
-            <span class="text-slate-500">/</span>
-            <span class="text-slate-400">${day.minTemp}°</span>
+        <div class="py-3 flex items-center justify-between gap-2 text-xs hover:bg-white/5 px-2 rounded-xl transition">
+          <!-- 1. Day of week & date -->
+          <div class="w-20 text-left">
+            <div class="${dayClass}">${dayLabel}</div>
+            <div class="text-[10px] text-slate-400">${day.date.substring(5)}</div>
           </div>
 
-          <div class="w-full pt-2 border-t border-white/5 flex flex-col items-center text-xs">
-            <span class="${popColor}">💧 ${day.maxPop}%</span>
-            <span class="text-[10px] text-slate-400">${day.precipSum > 0 ? day.precipSum + 'mm' : '비 없음'}</span>
+          <!-- 2. Weather Icon + Rain Prob -->
+          <div class="flex items-center gap-2 w-28 justify-start">
+            <span class="text-2xl">${day.weatherIcon}</span>
+            <div>
+              <div class="text-[11px] text-slate-200 truncate font-medium">${day.weatherDesc}</div>
+              <div class="text-[10px] ${popColor}">💧 ${day.maxPop}%</div>
+            </div>
+          </div>
+
+          <!-- 3. Min Temp -> Range Bar -> Max Temp -->
+          <div class="flex-1 flex items-center justify-end gap-2 max-w-[150px]">
+            <span class="text-slate-400 font-medium w-6 text-right">${day.minTemp}°</span>
+            <div class="flex-1 temp-bar-bg h-1.5 relative overflow-hidden">
+              <div class="temp-bar-fill" style="left: ${leftPercent}%; width: ${widthPercent}%;"></div>
+            </div>
+            <span class="text-white font-bold w-6 text-left">${day.maxTemp}°</span>
           </div>
         </div>
       `;
     }).join('');
-
-    this.elements.dailyCardsContainer.querySelectorAll('div[data-day-index]').forEach(card => {
-      card.addEventListener('click', () => {
-        this.selectedDayIndex = parseInt(card.getAttribute('data-day-index'), 10);
-        this.renderDailyForecast();
-        this.renderHourlyTimeline();
-      });
-    });
   }
 
   renderFavorites() {
     if (!this.elements.favList) return;
     const favs = GeoService.getFavorites();
     if (favs.length === 0) {
-      this.elements.favList.innerHTML = '<span class="text-xs text-slate-500">즐겨찾기한 위치가 없습니다.</span>';
+      this.elements.favList.innerHTML = '<span class="text-[11px] text-slate-500">즐겨찾기한 위치가 없습니다.</span>';
       return;
     }
 
     this.elements.favList.innerHTML = favs.map(f => `
-      <div class="flex items-center gap-1.5 px-3 py-1 bg-white/5 hover:bg-white/10 rounded-full text-xs text-slate-300 cursor-pointer border border-white/10 transition"
+      <div class="flex items-center gap-1 px-2.5 py-1 bg-white/5 hover:bg-white/10 rounded-full text-xs text-slate-300 cursor-pointer border border-white/10 transition flex-shrink-0"
            data-lat="${f.latitude}" data-lon="${f.longitude}" data-name="${f.name}" data-country="${f.country}">
         <span>📍 ${f.name}</span>
-        <button class="text-slate-500 hover:text-rose-400 ml-1 text-xs" data-del-id="${f.id}">✕</button>
+        <button class="text-slate-500 hover:text-rose-400 ml-0.5 text-xs" data-del-id="${f.id}">✕</button>
       </div>
     `).join('');
 
@@ -594,10 +510,10 @@ class WeatherApp {
     if (!this.elements.favBtn) return;
     const favs = GeoService.getFavorites();
     const isFav = favs.some(f => Math.abs(f.latitude - this.currentLocation.latitude) < 0.01 && Math.abs(f.longitude - this.currentLocation.longitude) < 0.01);
-    this.elements.favBtn.textContent = isFav ? '⭐ 즐겨찾기 해제' : '☆ 즐겨찾기 추가';
+    this.elements.favBtn.textContent = isFav ? '⭐ 즐겨찾기 해제' : '☆ 즐겨찾기';
     this.elements.favBtn.className = isFav
-      ? 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 cursor-pointer'
-      : 'px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 cursor-pointer';
+      ? 'px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 cursor-pointer'
+      : 'px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 cursor-pointer';
   }
 
   // --- Gemini AI Logic ---
@@ -617,7 +533,7 @@ class WeatherApp {
     this.updateGeminiKeyStatus();
     this.closeGeminiModal();
     if (key) {
-      alert('Gemini API 키가 저장되었습니다. 이제 AI 정밀 기상 분석 및 Q&A를 사용할 수 있습니다!');
+      alert('Gemini API 키가 저장되었습니다!');
     }
   }
 
@@ -625,11 +541,11 @@ class WeatherApp {
     if (!this.elements.geminiKeyStatus) return;
     const hasKey = GeminiAI.hasApiKey();
     if (hasKey) {
-      this.elements.geminiKeyStatus.textContent = '🔑 Gemini AI 연동됨';
-      this.elements.geminiKeyStatus.className = 'text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/30';
+      this.elements.geminiKeyStatus.textContent = '✨ AI 활성';
+      this.elements.geminiKeyStatus.className = 'text-[11px] text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-lg border border-emerald-500/30';
     } else {
-      this.elements.geminiKeyStatus.textContent = '⚙️ Gemini API 설정';
-      this.elements.geminiKeyStatus.className = 'text-xs text-indigo-300 bg-indigo-500/20 px-2.5 py-1 rounded-full border border-indigo-500/30';
+      this.elements.geminiKeyStatus.textContent = '✨ AI 설정';
+      this.elements.geminiKeyStatus.className = 'text-[11px] text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded-lg border border-indigo-500/30';
     }
   }
 
@@ -644,9 +560,9 @@ class WeatherApp {
     try {
       if (this.elements.geminiBriefingContent) {
         this.elements.geminiBriefingContent.innerHTML = `
-          <div class="flex items-center gap-3 py-6 justify-center text-indigo-300">
-            <div class="w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
-            <span class="text-sm">Gemini AI가 실시간 기상 데이터를 정밀 분석 중입니다...</span>
+          <div class="flex items-center gap-2 py-4 justify-center text-indigo-300 text-xs">
+            <div class="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+            <span>Gemini AI가 정밀 분석 중입니다...</span>
           </div>
         `;
       }
@@ -655,18 +571,18 @@ class WeatherApp {
       const markdown = await GeminiAI.getAiWeatherAnalysis(this.forecastData, this.currentLocation.name);
       
       const formatted = markdown
-        .replace(/^### (.*$)/gim, '<h4 class="font-bold text-indigo-300 mt-3 mb-1 text-sm">$1</h4>')
-        .replace(/^## (.*$)/gim, '<h3 class="font-bold text-white mt-4 mb-2 text-base">$1</h3>')
-        .replace(/^\* (.*$)/gim, '<li class="ml-4 list-disc text-slate-200 text-sm mb-1">$1</li>')
+        .replace(/^### (.*$)/gim, '<h4 class="font-bold text-indigo-300 mt-2 mb-1 text-xs">$1</h4>')
+        .replace(/^## (.*$)/gim, '<h3 class="font-bold text-white mt-3 mb-1.5 text-sm">$1</h3>')
+        .replace(/^\* (.*$)/gim, '<li class="ml-3 list-disc text-slate-200 text-xs mb-0.5">$1</li>')
         .replace(/\*\*(.*?)\*\*/gim, '<strong class="text-indigo-200 font-semibold">$1</strong>')
-        .replace(/\n\n/g, '<div class="h-2"></div>')
+        .replace(/\n\n/g, '<div class="h-1.5"></div>')
         .replace(/\n/g, '<br>');
 
       if (this.elements.geminiBriefingContent) this.elements.geminiBriefingContent.innerHTML = formatted;
     } catch (err) {
       if (this.elements.geminiBriefingContent) {
         this.elements.geminiBriefingContent.innerHTML = `
-          <div class="p-3 bg-rose-500/20 border border-rose-500/30 text-rose-300 rounded-xl text-sm">
+          <div class="p-2.5 bg-rose-500/20 border border-rose-500/30 text-rose-300 rounded-xl text-xs">
             ⚠️ AI 분석 오류: ${err.message}
           </div>
         `;
@@ -687,9 +603,9 @@ class WeatherApp {
     this.elements.geminiChatInput.value = '';
 
     const userMsg = document.createElement('div');
-    userMsg.className = 'flex justify-end mb-3';
+    userMsg.className = 'flex justify-end mb-2';
     userMsg.innerHTML = `
-      <div class="bg-indigo-600 text-white rounded-2xl rounded-tr-none px-4 py-2 text-sm max-w-[85%] shadow">
+      <div class="bg-indigo-600 text-white rounded-xl rounded-tr-none px-3 py-1.5 text-xs max-w-[85%] shadow">
         ${question}
       </div>
     `;
@@ -697,10 +613,10 @@ class WeatherApp {
     this.elements.geminiChatMessages.scrollTop = this.elements.geminiChatMessages.scrollHeight;
 
     const botLoading = document.createElement('div');
-    botLoading.className = 'flex justify-start mb-3';
+    botLoading.className = 'flex justify-start mb-2';
     botLoading.innerHTML = `
-      <div class="bg-slate-800 border border-white/10 text-slate-300 rounded-2xl rounded-tl-none px-4 py-2 text-sm max-w-[85%] flex items-center gap-2">
-        <div class="w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+      <div class="bg-slate-800 border border-white/10 text-slate-300 rounded-xl rounded-tl-none px-3 py-1.5 text-xs max-w-[85%] flex items-center gap-2">
+        <div class="w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
         <span>답변 분석 중...</span>
       </div>
     `;
@@ -710,13 +626,13 @@ class WeatherApp {
     try {
       const reply = await GeminiAI.askQuestion(question, this.forecastData, this.currentLocation.name);
       botLoading.innerHTML = `
-        <div class="bg-slate-800/90 border border-white/10 text-slate-200 rounded-2xl rounded-tl-none px-4 py-2.5 text-sm max-w-[90%] shadow-lg leading-relaxed whitespace-pre-line">
+        <div class="bg-slate-800/90 border border-white/10 text-slate-200 rounded-xl rounded-tl-none px-3 py-2 text-xs max-w-[90%] shadow-lg leading-relaxed whitespace-pre-line">
           ${reply.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}
         </div>
       `;
     } catch (err) {
       botLoading.innerHTML = `
-        <div class="bg-rose-950/60 border border-rose-500/30 text-rose-300 rounded-2xl rounded-tl-none px-4 py-2 text-sm">
+        <div class="bg-rose-950/60 border border-rose-500/30 text-rose-300 rounded-xl rounded-tl-none px-3 py-1.5 text-xs">
           ⚠️ 오류: ${err.message}
         </div>
       `;
