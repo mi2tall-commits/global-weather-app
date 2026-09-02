@@ -12,7 +12,7 @@
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/styles.css?v=2.5">
   
   <!-- Font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -63,7 +63,7 @@
         <input 
           id="searchInput" 
           type="text" 
-          placeholder="🔍 다른 지역 검색 (서울, 강남구, 도쿄, 뉴욕...)" 
+          placeholder="🔍 다른 지역/동네 검색 (역삼동, 서초동, 판교, 도쿄...)" 
           class="w-full bg-slate-950/70 border border-white/10 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition"
         />
         <div id="searchResults" class="absolute left-0 right-0 top-full mt-1.5 bg-slate-900/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl z-50 max-h-56 overflow-y-auto hidden"></div>
@@ -73,7 +73,7 @@
       <div id="favList" class="mt-2.5 flex items-center gap-1.5 overflow-x-auto custom-scrollbar flex-nowrap pt-1"></div>
     </header>
 
-    <!-- 2. ✨ Gemini AI 기상 분석관 & 실시간 Q&A (최상단 배치!) -->
+    <!-- 2. ✨ Gemini AI 기상 분석관 & 실시간 Q&A (최상단) -->
     <section class="weather-card p-4 sm:p-5 border-indigo-500/30 bg-gradient-to-br from-indigo-950/50 via-slate-900/60 to-purple-950/40 shadow-lg">
       <div class="flex items-center justify-between gap-2 mb-3">
         <div class="flex items-center gap-2">
@@ -180,12 +180,14 @@
       </p>
     </section>
 
-    <!-- 5. Expandable Vertical Daily & Hourly Forecast (날짜 클릭 시 세로로 시간대별 예보가 촤르륵 펼쳐짐!) -->
+    <!-- 5. Expandable Vertical Daily & Hourly Forecast -->
     <section class="weather-card p-4 sm:p-5">
+      
+      <!-- Top Title & Interval Controls -->
       <div class="flex items-center justify-between mb-3">
         <div>
           <h3 class="text-sm font-bold text-white">📅 일자별 예보 (최대 16일)</h3>
-          <p class="text-[11px] text-slate-400">날짜를 누르면 <span class="text-indigo-300 font-semibold">해당 일의 시간대별 세부 예보가 세로로 펼쳐집니다.</span></p>
+          <p class="text-[11px] text-slate-400">터치하여 <span class="text-indigo-300 font-semibold">시간대별 세부 예보를 펼쳐보세요.</span></p>
         </div>
 
         <!-- 1h / 3h Interval Toggle -->
@@ -197,6 +199,19 @@
             3시간
           </button>
         </div>
+      </div>
+
+      <!-- Quick Day Switcher Tabs (오늘 / 내일 / 모레 즉시 펼침 버튼) -->
+      <div class="flex items-center gap-2 mb-3 bg-slate-950/70 p-1.5 rounded-2xl border border-white/5 text-xs font-semibold">
+        <button id="tabTodayBtn" class="flex-1 py-1.5 rounded-xl bg-indigo-600 text-white shadow transition cursor-pointer text-center">
+          오늘 날씨
+        </button>
+        <button id="tabTomorrowBtn" class="flex-1 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition cursor-pointer text-center">
+          내일 날씨
+        </button>
+        <button id="tabDay3Btn" class="flex-1 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition cursor-pointer text-center">
+          모레 날씨
+        </button>
       </div>
 
       <!-- Vertical Accordion List -->
@@ -252,7 +267,7 @@
     <div class="text-xs font-semibold text-white">글로벌 앙상블 기상 데이터 수집 중...</div>
   </div>
 
-  <!-- Main JavaScript App -->
-  <script type="module" src="js/app.js"></script>
+  <!-- Main JavaScript App (with cache busting) -->
+  <script type="module" src="js/app.js?v=2.5"></script>
 </body>
 </html>
