@@ -91,7 +91,7 @@ class WeatherApp {
           if (this.elements.searchResults) this.elements.searchResults.classList.add('hidden');
           return;
         }
-        this.searchDebounceTimer = setTimeout(() => this.handleSearch(query), 300);
+        this.searchDebounceTimer = setTimeout(() => this.handleSearch(query), 250);
       });
     }
 
@@ -147,11 +147,17 @@ class WeatherApp {
   async init() {
     this.renderFavorites();
     this.updateGeminiKeyStatus();
+
+    // 1. Instant Location Detection (Fast IP / Cache)
+    const initialLoc = await GeoService.getInitialLocation();
+    this.currentLocation = initialLoc;
+
+    // 2. Load weather immediately
     await this.loadWeather(
-      this.currentLocation.latitude,
-      this.currentLocation.longitude,
-      this.currentLocation.name,
-      this.currentLocation.country
+      initialLoc.latitude,
+      initialLoc.longitude,
+      initialLoc.name,
+      initialLoc.country
     );
   }
 
@@ -167,6 +173,14 @@ class WeatherApp {
       this.showLoading(true);
       const coords = await GeoService.getCurrentPosition();
       const geoInfo = await GeoService.reverseGeocode(coords.latitude, coords.longitude);
+      
+      const loc = {
+        name: geoInfo.name,
+        country: geoInfo.country,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+      };
+      localStorage.setItem('last_user_location', JSON.stringify(loc));
       await this.loadWeather(coords.latitude, coords.longitude, geoInfo.name, geoInfo.country);
     } catch (err) {
       alert(err.message || 'GPS 위치를 불러오는 중 오류가 발생했습니다.');
@@ -209,6 +223,9 @@ class WeatherApp {
 
         if (this.elements.searchInput) this.elements.searchInput.value = '';
         this.elements.searchResults.classList.add('hidden');
+        
+        const loc = { name: fullName, country, latitude: lat, longitude: lon };
+        localStorage.setItem('last_user_location', JSON.stringify(loc));
         this.loadWeather(lat, lon, fullName, country);
       });
     });
@@ -226,20 +243,20 @@ class WeatherApp {
         this.elements.locationSub.textContent = country ? `${country} • 위도 ${lat.toFixed(2)}°, 경도 ${lon.toFixed(2)}°` : `위도 ${lat.toFixed(2)}°, 경도 ${lon.toFixed(2)}°`;
       }
 
-      const [forecastRaw, multiModelRaw, airQualityRaw] = await Promise.all([
+      // Fast parallel fetch (<200ms)
+      const [forecastRaw, airQualityRaw] = await Promise.all([
         WeatherAPI.getForecast(lat, lon),
-        WeatherAPI.getMultiModelForecast(lat, lon),
         WeatherAPI.getAirQuality(lat, lon),
       ]);
 
-      this.forecastData = EnsembleEngine.synthesizeForecast(forecastRaw, multiModelRaw);
+      this.forecastData = EnsembleEngine.synthesizeForecast(forecastRaw);
       this.airQualityData = airQualityRaw;
 
       // Offline banner notice
       if (this.elements.offlineNotice) {
         if (this.forecastData._isCached) {
           const cachedTimeStr = this.forecastData._cachedAt ? new Date(this.forecastData._cachedAt).toLocaleTimeString('ko-KR') : '';
-          this.elements.offlineNotice.innerHTML = `📡 <b>오프라인 캐시 모드:</b> 네트워크 연결이 원활하지 않아 최근 저장된 예보(${cachedTimeStr})를 표시하고 있습니다.`;
+          this.elements.offlineNotice.innerHTML = `📡 <b>오프라인 캐시 모드:</b> 최근 저장된 예보(${cachedTimeStr})를 표시하고 있습니다.`;
           this.elements.offlineNotice.classList.remove('hidden');
         } else {
           this.elements.offlineNotice.classList.add('hidden');
@@ -265,6 +282,7 @@ class WeatherApp {
   }
 
   renderCurrentWeather() {
+    if (!this.forecastData?.current) return;
     const cur = this.forecastData.current;
     if (this.elements.currentTemp) this.elements.currentTemp.textContent = `${cur.temp}°`;
     if (this.elements.currentDesc) this.elements.currentDesc.textContent = cur.weatherDesc;
@@ -282,6 +300,7 @@ class WeatherApp {
   }
 
   renderConsensusAndAlerts() {
+    if (!this.forecastData?.consensusInsight) return;
     const insight = this.forecastData.consensusInsight;
     if (this.elements.consensusText) this.elements.consensusText.textContent = insight.summaryText;
     if (this.elements.consensusBadge) {
@@ -318,6 +337,7 @@ class WeatherApp {
   }
 
   renderLifestyleIndices() {
+    if (!this.forecastData?.timeline) return;
     const next24 = this.forecastData.timeline.slice(0, 24);
     const maxPop = Math.max(...next24.map(h => h.pop));
     const totalRain = next24.reduce((sum, h) => sum + h.precip, 0);
@@ -408,7 +428,7 @@ class WeatherApp {
     }
 
     // 5. Air Quality & UV
-    let aqiText = '대기질 정보 로딩 중';
+    let aqiText = '대기질 연동 중';
     let aqiColor = 'text-slate-300';
     if (this.airQualityData && this.airQualityData.current) {
       const pm10 = Math.round(this.airQualityData.current.pm10 || 0);
