@@ -8,7 +8,8 @@ class WeatherApp {
     this.currentLocation = GeoService.DEFAULT_LOCATION;
     this.forecastData = null;
     this.airQualityData = null;
-    this.hourlyInterval = 1; // 1 or 3
+    this.hourlyInterval = 3; // default 3-hour interval for comfortable readability
+    this.expandedDate = null; // Currently expanded day's date string
     this.searchDebounceTimer = null;
 
     this.initElements();
@@ -47,12 +48,11 @@ class WeatherApp {
       consensusBadge: document.getElementById('consensusBadge'),
       severeAlertBanner: document.getElementById('severeAlertBanner'),
 
-      // Hourly Timeline
+      // Hourly Interval Buttons
       interval1hBtn: document.getElementById('interval1hBtn'),
       interval3hBtn: document.getElementById('interval3hBtn'),
-      hourlyTimelineContainer: document.getElementById('hourlyTimelineContainer'),
 
-      // Vertical Weekly List
+      // Vertical Weekly Accordion List
       verticalWeeklyList: document.getElementById('verticalWeeklyList'),
 
       // Gemini AI Elements
@@ -141,7 +141,7 @@ class WeatherApp {
     this.renderFavorites();
     this.updateGeminiKeyStatus();
 
-    // 1. Instant Location (Fast IP or Cache)
+    // 1. Instant Location
     const initialLoc = await GeoService.getInitialLocation();
     this.currentLocation = initialLoc;
 
@@ -244,6 +244,11 @@ class WeatherApp {
       this.forecastData = EnsembleEngine.synthesizeForecast(forecastRaw);
       this.airQualityData = airQualityRaw;
 
+      // Default expand today's date
+      if (this.forecastData.dailyItems?.length > 0) {
+        this.expandedDate = this.forecastData.dailyItems[0].date;
+      }
+
       if (this.elements.offlineNotice) {
         if (this.forecastData._isCached) {
           const cachedTimeStr = this.forecastData._cachedAt ? new Date(this.forecastData._cachedAt).toLocaleTimeString('ko-KR') : '';
@@ -265,7 +270,6 @@ class WeatherApp {
   renderAll() {
     this.renderCurrentWeather();
     this.renderConsensusAndAlerts();
-    this.renderHourlyTimeline();
     this.renderVerticalWeeklyList();
     this.updateFavButtonState();
   }
@@ -286,7 +290,6 @@ class WeatherApp {
       this.elements.todayHighLow.textContent = `최고 ${today.maxTemp}° / 최저 ${today.minTemp}°`;
     }
 
-    // PM10 / PM2.5 Badges
     if (this.airQualityData?.current) {
       const pm10 = Math.round(this.airQualityData.current.pm10 || 0);
       const pm25 = Math.round(this.airQualityData.current.pm2_5 || 0);
@@ -366,53 +369,22 @@ class WeatherApp {
         this.elements.interval1hBtn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-medium text-slate-400 hover:text-white cursor-pointer';
       }
     }
-    this.renderHourlyTimeline();
-  }
-
-  renderHourlyTimeline() {
-    if (!this.elements.hourlyTimelineContainer || !this.forecastData) return;
-    const hours = this.forecastData.timeline.slice(0, 36); // next 36 hours
-    const step = this.hourlyInterval;
-    const filteredHours = hours.filter((_, idx) => idx % step === 0);
-
-    this.elements.hourlyTimelineContainer.innerHTML = filteredHours.map((h, i) => {
-      const popBadgeColor = h.pop >= 60 ? 'text-cyan-400 font-bold' : h.pop >= 30 ? 'text-cyan-300' : 'text-slate-500';
-      const precipHeight = Math.min(Math.max(h.precip * 6, h.pop > 20 ? 4 : 0), 32);
-      const isNow = i === 0;
-
-      return `
-        <div class="flex-shrink-0 flex flex-col items-center justify-between p-2.5 rounded-2xl weather-subcard w-20 text-center transition hover:bg-white/10">
-          <span class="text-[11px] font-medium ${isNow ? 'text-indigo-400 font-bold' : 'text-slate-400'}">
-            ${isNow ? '지금' : h.hour + '시'}
-          </span>
-          <span class="text-2xl my-1.5" title="${h.weatherDesc}">${h.weatherIcon}</span>
-          <span class="text-sm font-bold text-white mb-1">${h.temp}°</span>
-          
-          <div class="w-full flex flex-col items-center mt-1 pt-1.5 border-t border-white/5">
-            <span class="text-[10px] ${popBadgeColor}">💧 ${h.pop}%</span>
-            <div class="w-full h-7 flex items-end justify-center my-0.5 bg-black/20 rounded">
-              <div class="w-3 bg-gradient-to-t from-cyan-600 to-blue-400 rounded-t precip-bar" style="height: ${precipHeight}px;"></div>
-            </div>
-            <span class="text-[9px] text-slate-400 font-mono">${h.precip > 0 ? h.precip + 'mm' : '-'}</span>
-          </div>
-        </div>
-      `;
-    }).join('');
+    this.renderVerticalWeeklyList();
   }
 
   /**
-   * 날씨날씨 시그니처: 세로형 주간/일별 예보 리스트 렌더링
+   * 세로형 주간 예보 및 클릭 시 시간대별 아코디언 펼침 렌더러
    */
   renderVerticalWeeklyList() {
     if (!this.elements.verticalWeeklyList || !this.forecastData) return;
     const days = this.forecastData.dailyItems;
 
-    // Find min and max temp across all 16 days to normalize the bar
     const allMin = Math.min(...days.map(d => d.minTemp));
     const allMax = Math.max(...days.map(d => d.maxTemp));
     const tempRange = Math.max(allMax - allMin, 1);
 
     this.elements.verticalWeeklyList.innerHTML = days.map((day, idx) => {
+      const isExpanded = this.expandedDate === day.date;
       let dayLabel = `${day.date.substring(5)} (${day.dayOfWeek})`;
       let dayClass = 'text-slate-200';
       if (idx === 0) { dayLabel = '오늘'; dayClass = 'text-indigo-400 font-bold'; }
@@ -421,38 +393,93 @@ class WeatherApp {
 
       const popColor = day.maxPop >= 60 ? 'text-cyan-400 font-bold' : day.maxPop >= 30 ? 'text-cyan-300' : 'text-slate-500';
 
-      // Bar position calculation
       const leftPercent = ((day.minTemp - allMin) / tempRange) * 100;
       const widthPercent = Math.max(((day.maxTemp - day.minTemp) / tempRange) * 100, 10);
 
+      // Hourly timeline for this specific day
+      let hourlyContent = '';
+      if (isExpanded) {
+        const dayHours = this.forecastData.timeline.filter(h => h.date === day.date);
+        const step = this.hourlyInterval;
+        const filtered = dayHours.filter((_, i) => i % step === 0);
+
+        hourlyContent = `
+          <div class="mt-2.5 mb-1 p-3 rounded-2xl bg-slate-950/80 border border-white/5 space-y-2.5 animate-fadeIn">
+            <div class="flex items-center justify-between text-[11px] text-indigo-300 font-semibold px-1">
+              <span>🕒 ${dayLabel} 시간대별 상세 (${this.hourlyInterval}시간 간격)</span>
+              <span class="text-slate-400 font-normal">강수량: ${day.precipSum > 0 ? day.precipSum + 'mm' : '없음'}</span>
+            </div>
+
+            <!-- Horizontal / Grid Timeline inside expanded day -->
+            <div class="grid grid-cols-4 sm:grid-cols-8 gap-1.5 pt-1">
+              ${filtered.map(h => {
+                const hPopColor = h.pop >= 60 ? 'text-cyan-400 font-bold' : h.pop >= 30 ? 'text-cyan-300' : 'text-slate-500';
+                return `
+                  <div class="p-2 rounded-xl weather-subcard flex flex-col items-center justify-between text-center">
+                    <span class="text-[10px] text-slate-400 font-medium">${h.hour}시</span>
+                    <span class="text-xl my-1" title="${h.weatherDesc}">${h.weatherIcon}</span>
+                    <span class="text-xs font-bold text-white">${h.temp}°</span>
+                    <span class="text-[9px] ${hPopColor} mt-1">💧${h.pop}%</span>
+                    <span class="text-[8px] text-slate-400 font-mono">${h.precip > 0 ? h.precip + 'm' : '-'}</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }
+
       return `
-        <div class="py-3 flex items-center justify-between gap-2 text-xs hover:bg-white/5 px-2 rounded-xl transition">
-          <!-- 1. Day of week & date -->
-          <div class="w-20 text-left">
-            <div class="${dayClass}">${dayLabel}</div>
-            <div class="text-[10px] text-slate-400">${day.date.substring(5)}</div>
-          </div>
+        <div class="py-2.5 cursor-pointer rounded-2xl transition hover:bg-white/5" data-date="${day.date}">
+          <!-- Day Summary Row -->
+          <div class="flex items-center justify-between gap-2 px-2 text-xs">
+            <!-- 1. Day of week & date -->
+            <div class="w-20 text-left flex items-center gap-1.5">
+              <span class="text-[10px] text-slate-500 transition-transform ${isExpanded ? 'rotate-90 text-indigo-400' : ''}">▶</span>
+              <div>
+                <div class="${dayClass}">${dayLabel}</div>
+                <div class="text-[10px] text-slate-400">${day.date.substring(5)}</div>
+              </div>
+            </div>
 
-          <!-- 2. Weather Icon + Rain Prob -->
-          <div class="flex items-center gap-2 w-28 justify-start">
-            <span class="text-2xl">${day.weatherIcon}</span>
-            <div>
-              <div class="text-[11px] text-slate-200 truncate font-medium">${day.weatherDesc}</div>
-              <div class="text-[10px] ${popColor}">💧 ${day.maxPop}%</div>
+            <!-- 2. Weather Icon + Rain Prob -->
+            <div class="flex items-center gap-2 w-24 sm:w-28 justify-start">
+              <span class="text-2xl">${day.weatherIcon}</span>
+              <div>
+                <div class="text-[11px] text-slate-200 truncate font-medium">${day.weatherDesc}</div>
+                <div class="text-[10px] ${popColor}">💧 ${day.maxPop}%</div>
+              </div>
+            </div>
+
+            <!-- 3. Min Temp -> Range Bar -> Max Temp -->
+            <div class="flex-1 flex items-center justify-end gap-2 max-w-[140px] sm:max-w-[160px]">
+              <span class="text-slate-400 font-medium w-6 text-right">${day.minTemp}°</span>
+              <div class="flex-1 temp-bar-bg h-1.5 relative overflow-hidden">
+                <div class="temp-bar-fill" style="left: ${leftPercent}%; width: ${widthPercent}%;"></div>
+              </div>
+              <span class="text-white font-bold w-6 text-left">${day.maxTemp}°</span>
             </div>
           </div>
 
-          <!-- 3. Min Temp -> Range Bar -> Max Temp -->
-          <div class="flex-1 flex items-center justify-end gap-2 max-w-[150px]">
-            <span class="text-slate-400 font-medium w-6 text-right">${day.minTemp}°</span>
-            <div class="flex-1 temp-bar-bg h-1.5 relative overflow-hidden">
-              <div class="temp-bar-fill" style="left: ${leftPercent}%; width: ${widthPercent}%;"></div>
-            </div>
-            <span class="text-white font-bold w-6 text-left">${day.maxTemp}°</span>
-          </div>
+          <!-- Expanded Accordion Content -->
+          ${hourlyContent}
         </div>
       `;
     }).join('');
+
+    // Attach click listeners to accordion rows
+    this.elements.verticalWeeklyList.querySelectorAll('div[data-date]').forEach(row => {
+      row.addEventListener('click', (e) => {
+        // Prevent click when selecting text
+        const targetDate = row.getAttribute('data-date');
+        if (this.expandedDate === targetDate) {
+          this.expandedDate = null; // collapse
+        } else {
+          this.expandedDate = targetDate; // expand
+        }
+        this.renderVerticalWeeklyList();
+      });
+    });
   }
 
   renderFavorites() {
@@ -632,7 +659,7 @@ class WeatherApp {
       `;
     } catch (err) {
       botLoading.innerHTML = `
-        <div class="bg-rose-950/60 border border-rose-500/30 text-rose-300 rounded-xl rounded-tl-none px-3 py-1.5 text-xs">
+        <div class="bg-rose-950/60 border border-rose-500/30 text-rose-300 rounded-xl text-xs">
           ⚠️ 오류: ${err.message}
         </div>
       `;
