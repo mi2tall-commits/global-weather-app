@@ -2,9 +2,9 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#4f46e5">
-  <title>글로벌 앙상블 종합 날씨 & Gemini AI 기상 분석</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0b1120">
+  <title>글로벌 앙상블 종합 날씨</title>
   
   <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json">
@@ -19,310 +19,237 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
-<body class="antialiased min-h-screen pb-16">
+<body class="antialiased min-h-screen pb-24 text-slate-100">
 
-  <!-- Main Container -->
-  <div class="max-w-6xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+  <!-- Mobile-first Container (Max width 640px for comfortable vertical readability) -->
+  <div class="max-w-xl mx-auto px-4 py-5 space-y-4">
     
     <!-- Offline Notice Banner -->
-    <div id="offlineNotice" class="hidden mb-4 p-3 bg-amber-500/20 border border-amber-500/40 text-amber-200 rounded-2xl text-xs sm:text-sm font-medium flex items-center justify-between">
+    <div id="offlineNotice" class="hidden p-3 bg-amber-500/20 border border-amber-500/40 text-amber-200 rounded-2xl text-xs font-medium flex items-center justify-between">
       <span>📡 오프라인 모드: 저장된 최근 예보 데이터를 표시 중입니다.</span>
     </div>
 
-    <!-- Top Navigation & Search Header -->
-    <header class="glass-panel rounded-3xl p-5 sm:p-6 mb-6">
-      <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+    <!-- 1. Header: Location & Search & Controls -->
+    <header class="weather-card p-4 sm:p-5">
+      <div class="flex items-center justify-between gap-2 mb-3">
         
-        <!-- App Title & Location Status -->
-        <div class="flex items-center gap-3 w-full md:w-auto">
-          <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 to-cyan-400 flex items-center justify-center text-2xl shadow-lg shadow-indigo-500/30">
-            🌍
-          </div>
-          <div>
-            <div class="flex items-center gap-2">
-              <h1 id="locationName" class="text-xl sm:text-2xl font-bold tracking-tight text-white">위치 불러오는 중...</h1>
-              <button id="favBtn" class="px-2.5 py-1 rounded-lg text-xs font-medium bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition">
-                ☆ 즐겨찾기
-              </button>
-            </div>
-            <p id="locationSub" class="text-xs sm:text-sm text-slate-400">글로벌 다중 기상 모델 + Gemini AI 앙상블 분석</p>
+        <!-- Location Title -->
+        <div class="flex items-center gap-2 flex-1 min-w-0">
+          <button id="gpsBtn" title="현재 GPS 위치 찾기" class="p-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 rounded-xl text-white shadow-md transition flex-shrink-0 cursor-pointer">
+            📍
+          </button>
+          <div class="truncate">
+            <h1 id="locationName" class="text-lg sm:text-xl font-bold tracking-tight text-white truncate">위치 확인 중...</h1>
+            <p id="locationSub" class="text-[11px] text-slate-400 truncate">글로벌 앙상블 모델 종합 분석</p>
           </div>
         </div>
 
-        <!-- Search Bar & Controls -->
-        <div class="flex items-center gap-2 w-full md:w-auto relative">
-          <div class="relative flex-1 md:w-72">
-            <input 
-              id="searchInput" 
-              type="text" 
-              placeholder="도시/지역 검색 (서울, 도쿄, 뉴욕...)" 
-              class="w-full bg-slate-900/80 border border-white/10 rounded-2xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition shadow-inner"
-            />
-            <div id="searchResults" class="absolute left-0 right-0 top-full mt-2 bg-slate-900/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl z-50 max-h-64 overflow-y-auto hidden"></div>
-          </div>
-          
-          <!-- GPS Button -->
-          <button 
-            id="gpsBtn" 
-            title="현재 GPS 위치 가져오기"
-            class="p-2.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 rounded-2xl text-white shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-1.5 text-sm font-semibold transition flex-shrink-0"
-          >
-            <span>📍</span>
-            <span class="hidden sm:inline">내 GPS</span>
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <button id="favBtn" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition cursor-pointer">
+            ☆ 즐겨찾기
           </button>
-
-          <!-- Gemini Settings Trigger -->
-          <button 
-            id="geminiSettingsBtn"
-            title="Gemini AI API 키 설정"
-            class="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-slate-300 transition flex items-center gap-1.5 flex-shrink-0"
-          >
-            <span id="geminiKeyStatus" class="text-xs text-indigo-300 bg-indigo-500/20 px-2.5 py-1 rounded-full border border-indigo-500/30">
-              ⚙️ Gemini AI
+          <button id="geminiSettingsBtn" title="Gemini AI 설정" class="p-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-slate-300 transition cursor-pointer">
+            <span id="geminiKeyStatus" class="text-[11px] text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded-lg">
+              ✨ AI
             </span>
           </button>
         </div>
 
       </div>
 
-      <!-- Favorites Bar -->
-      <div class="mt-4 pt-4 border-t border-white/5 flex items-center gap-2 overflow-x-auto custom-scrollbar">
-        <span class="text-xs text-slate-400 font-medium flex-shrink-0">⭐ 즐겨찾기 위치:</span>
-        <div id="favList" class="flex items-center gap-2 flex-nowrap"></div>
+      <!-- Search Input -->
+      <div class="relative">
+        <input 
+          id="searchInput" 
+          type="text" 
+          placeholder="🔍 다른 지역 검색 (서울, 강남구, 도쿄, 뉴욕...)" 
+          class="w-full bg-slate-950/70 border border-white/10 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition"
+        />
+        <div id="searchResults" class="absolute left-0 right-0 top-full mt-1.5 bg-slate-900/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl z-50 max-h-56 overflow-y-auto hidden"></div>
       </div>
+
+      <!-- Quick Favorites Chips -->
+      <div id="favList" class="mt-2.5 flex items-center gap-1.5 overflow-x-auto custom-scrollbar flex-nowrap pt-1"></div>
     </header>
 
-    <!-- Severe Weather Alerts Container -->
-    <div id="severeAlertBanner" class="hidden mb-6"></div>
+    <!-- Severe Alert Banner (if any) -->
+    <div id="severeAlertBanner" class="hidden"></div>
 
-    <!-- Consensus Intelligence Banner -->
-    <section id="consensusCard" class="glass-panel rounded-3xl p-5 mb-6 border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 to-slate-900/60">
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
-        <div class="flex items-center gap-2.5">
-          <span class="text-xl">🤖</span>
-          <h2 class="text-base font-bold text-indigo-300">글로벌 앙상블 종합 분석 브리핑</h2>
-          <span class="text-[11px] text-slate-400 bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
-            ECMWF • 기상청 • GFS • ICON • GEM
-          </span>
-        </div>
-        <div>
-          <span id="consensusBadge" class="text-xs px-2.5 py-1 rounded-full font-medium border bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
-            글로벌 모델 일치도: 높음
-          </span>
+    <!-- 2. Hero Section: 날씨날씨 스타일 현재 날씨 메인 카드 -->
+    <section class="weather-card p-6 text-center relative overflow-hidden">
+      <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+        <span id="updateTime">기준: --:--</span>
+        <span id="todayHighLow" class="font-medium text-slate-300">최고 --° / 최저 --°</span>
+      </div>
+
+      <!-- Big Temp & Icon -->
+      <div class="flex items-center justify-center gap-4 my-3">
+        <div id="currentIcon" class="text-6xl sm:text-7xl filter drop-shadow-md">☀️</div>
+        <div class="text-left">
+          <div id="currentTemp" class="text-6xl sm:text-7xl font-black text-white tracking-tighter">--°</div>
+          <div class="flex items-center gap-2 mt-1">
+            <span id="currentDesc" class="text-base font-semibold text-indigo-200">맑음</span>
+            <span id="currentApparent" class="text-xs text-slate-400 font-medium">체감 --°C</span>
+          </div>
         </div>
       </div>
-      <p id="consensusText" class="text-sm text-slate-200 leading-relaxed">
-        전 세계 기상청 및 수치예보 모델을 종합 분석 중입니다...
+
+      <!-- Quick Status Badges Row (미세먼지, 초미세먼지, 습도, 바람, 강수) -->
+      <div class="grid grid-cols-4 gap-2 mt-5 pt-4 border-t border-white/10 text-xs">
+        <div class="weather-subcard p-2 rounded-xl text-center">
+          <div class="text-[11px] text-slate-400 mb-0.5">미세먼지</div>
+          <div id="pm10Badge" class="font-bold text-emerald-400">좋음 🍃</div>
+        </div>
+        <div class="weather-subcard p-2 rounded-xl text-center">
+          <div class="text-[11px] text-slate-400 mb-0.5">초미세</div>
+          <div id="pm25Badge" class="font-bold text-emerald-400">좋음 🟢</div>
+        </div>
+        <div class="weather-subcard p-2 rounded-xl text-center">
+          <div class="text-[11px] text-slate-400 mb-0.5">습도</div>
+          <div id="currentHumidity" class="font-bold text-white">--%</div>
+        </div>
+        <div class="weather-subcard p-2 rounded-xl text-center">
+          <div class="text-[11px] text-slate-400 mb-0.5">바람</div>
+          <div id="currentWind" class="font-bold text-white">-- km/h</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Global Ensemble Consensus Intelligence Card -->
+    <section id="consensusCard" class="weather-card p-4 border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 to-slate-900/60">
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">🤖</span>
+          <h2 class="text-xs sm:text-sm font-bold text-indigo-300">글로벌 앙상블 종합 브리핑</h2>
+        </div>
+        <span id="consensusBadge" class="text-[10px] px-2 py-0.5 rounded-full font-semibold border bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+          일치도: 높음
+        </span>
+      </div>
+      <p id="consensusText" class="text-xs text-slate-200 leading-relaxed">
+        ECMWF, 한국 기상청, GFS 모델 데이터를 분석 중입니다...
       </p>
     </section>
 
-    <!-- Grid: Current Weather & Lifestyle Indices -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-      
-      <!-- Current Primary Weather Card -->
-      <div class="glass-panel rounded-3xl p-6 lg:col-span-1 flex flex-col justify-between relative overflow-hidden">
-        <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
-        <div>
-          <div class="flex items-center justify-between mb-4">
-            <span class="text-xs font-semibold uppercase tracking-wider text-indigo-400">현재 날씨</span>
-            <span id="updateTime" class="text-xs text-slate-400">기준: --:--</span>
-          </div>
-
-          <div class="flex items-center justify-between my-2">
-            <div>
-              <div id="currentTemp" class="text-6xl font-extrabold text-white tracking-tight">--°</div>
-              <div id="currentDesc" class="text-lg font-medium text-slate-300 mt-1">로딩 중...</div>
-            </div>
-            <div id="currentIcon" class="text-7xl filter drop-shadow-lg animate-pulse">☀️</div>
-          </div>
+    <!-- 4. Hourly Forecast Timeline (시간대별 예보 - 수평 스크롤 스트립) -->
+    <section class="weather-card p-4 sm:p-5">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-1.5">
+          <span class="text-sm font-bold text-white">🕒 시간별 예보</span>
+          <span class="text-[11px] text-slate-400">(비 확률 & 강수량)</span>
         </div>
 
-        <div class="grid grid-cols-3 gap-2.5 mt-6 pt-6 border-t border-white/10 text-xs">
-          <div class="glass-card p-2.5 rounded-xl text-center">
-            <div class="text-slate-400 mb-0.5">체감 온도</div>
-            <div id="currentApparent" class="text-sm font-bold text-white">--°C</div>
-          </div>
-          <div class="glass-card p-2.5 rounded-xl text-center">
-            <div class="text-slate-400 mb-0.5">습도</div>
-            <div id="currentHumidity" class="text-sm font-bold text-white">--%</div>
-          </div>
-          <div class="glass-card p-2.5 rounded-xl text-center">
-            <div class="text-slate-400 mb-0.5">바람</div>
-            <div id="currentWind" class="text-sm font-bold text-white">-- km/h</div>
-          </div>
-          <div class="glass-card p-2.5 rounded-xl text-center">
-            <div class="text-slate-400 mb-0.5">현재 강수</div>
-            <div id="currentPrecip" class="text-sm font-bold text-white">-- mm</div>
-          </div>
-          <div class="glass-card p-2.5 rounded-xl text-center col-span-2">
-            <div class="text-slate-400 mb-0.5">기압</div>
-            <div id="currentPressure" class="text-sm font-bold text-white">-- hPa</div>
-          </div>
+        <!-- 1h / 3h Interval Toggle -->
+        <div class="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-white/10">
+          <button id="interval1hBtn" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-indigo-600 text-white shadow cursor-pointer">
+            1시간
+          </button>
+          <button id="interval3hBtn" class="px-2.5 py-1 rounded-lg text-[11px] font-medium text-slate-400 hover:text-white cursor-pointer">
+            3시간
+          </button>
         </div>
       </div>
 
-      <!-- Lifestyle & Environment Indices -->
-      <div class="glass-panel rounded-3xl p-6 lg:col-span-2 flex flex-col justify-between">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-sm font-bold text-slate-200">생활 & 외출 맞춤 가이드</h3>
-          <span class="text-xs text-indigo-400 font-medium">실시간 산출</span>
-        </div>
+      <!-- Horizontal scroll strip -->
+      <div id="hourlyTimelineContainer" class="flex gap-2.5 overflow-x-auto pb-2 custom-scrollbar"></div>
+    </section>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-          <div id="umbrellaCard" class="glass-card p-4 rounded-2xl">
-            <div class="text-xs text-slate-400">우산 지수</div>
-            <div class="text-sm font-bold text-slate-200 mt-1">계산 중...</div>
-          </div>
-
-          <div id="outfitCard" class="glass-card p-4 rounded-2xl">
-            <div class="text-xs text-slate-400">옷차림 추천</div>
-            <div class="text-sm font-bold text-slate-200 mt-1">계산 중...</div>
-          </div>
-
-          <div id="carwashCard" class="glass-card p-4 rounded-2xl">
-            <div class="text-xs text-slate-400">세차 / 빨래 지수</div>
-            <div class="text-sm font-bold text-slate-200 mt-1">계산 중...</div>
-          </div>
-
-          <div id="outdoorCard" class="glass-card p-4 rounded-2xl">
-            <div class="text-xs text-slate-400">야외 활동 지수</div>
-            <div class="text-sm font-bold text-slate-200 mt-1">계산 중...</div>
-          </div>
-
-          <div id="airQualityCard" class="glass-card p-4 rounded-2xl sm:col-span-2">
-            <div class="text-xs text-slate-400">미세먼지 / 대기질</div>
-            <div class="text-sm font-bold text-slate-200 mt-1">대기질 연동 중...</div>
-          </div>
-        </div>
+    <!-- 5. Vertical Weekly Forecast List (날씨날씨 스타일 16일 세로 주간 예보 리스트) -->
+    <section class="weather-card p-4 sm:p-5">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-sm font-bold text-white">📅 일자별 예보 (최대 16일)</span>
+        <span class="text-[11px] text-indigo-400">날짜별 기온 범위 & 강수</span>
       </div>
 
-    </div>
+      <!-- Clean vertical list -->
+      <div id="verticalWeeklyList" class="divide-y divide-white/5"></div>
+    </section>
 
-    <!-- Gemini AI Weather Consulting & Q&A Center -->
-    <section class="glass-panel rounded-3xl p-6 mb-6 border-indigo-500/20">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+    <!-- 6. Gemini AI Weather Consulting & Q&A Assistant -->
+    <section class="weather-card p-4 sm:p-5 border-indigo-500/20">
+      <div class="flex items-center justify-between gap-2 mb-3">
         <div class="flex items-center gap-2">
-          <span class="text-2xl">✨</span>
+          <span class="text-xl">✨</span>
           <div>
-            <h3 class="text-base font-bold text-white">Gemini AI 정밀 기상 분석관 & Q&A</h3>
-            <p class="text-xs text-slate-400">Google Gemini 1.5 Flash로 분석하는 라이프스타일 맞춤 컨설팅</p>
+            <h3 class="text-sm font-bold text-white">Gemini AI 정밀 기상 분석관</h3>
+            <p class="text-[11px] text-slate-400">Google Gemini 기반 맞춤형 날씨 Q&A</p>
           </div>
         </div>
         <button 
           id="geminiBriefingBtn"
-          class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-95 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition flex items-center gap-2 self-start sm:self-auto cursor-pointer"
+          class="px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 active:scale-95 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer flex-shrink-0"
         >
-          <span>🪄 AI 심층 브리핑 생성</span>
+          <span>🪄 AI 브리핑</span>
         </button>
       </div>
 
       <!-- AI Detailed Briefing View -->
-      <div id="geminiBriefingCard" class="hidden mb-5 p-5 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 text-sm">
-        <div id="geminiBriefingContent" class="text-slate-200 leading-relaxed"></div>
+      <div id="geminiBriefingCard" class="hidden mb-3 p-4 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 text-xs sm:text-sm">
+        <div id="geminiBriefingContent" class="text-slate-200 leading-relaxed space-y-2"></div>
       </div>
 
-      <!-- Interactive Q&A Chat Box -->
-      <div class="rounded-2xl bg-slate-900/70 border border-white/5 p-4">
-        <div class="text-xs font-semibold text-slate-400 mb-3 flex items-center gap-1.5">
-          <span>💬</span> <span>실시간 날씨 궁금증 물어보기 (예: "오늘 세차해도 돼?", "내일 캠핑 가도 괜찮을까?")</span>
-        </div>
-        
-        <div id="geminiChatMessages" class="max-h-56 overflow-y-auto mb-3 custom-scrollbar pr-2 space-y-2">
-          <div class="text-xs text-slate-500 italic text-center py-2">질문을 입력하면 현재 기상 데이터를 토대로 AI가 정밀 분석해 드립니다.</div>
+      <!-- Q&A Box -->
+      <div class="rounded-2xl bg-slate-950/70 border border-white/5 p-3">
+        <div id="geminiChatMessages" class="max-h-48 overflow-y-auto mb-2.5 custom-scrollbar pr-1 space-y-2">
+          <div class="text-[11px] text-slate-500 text-center py-1">
+            "오늘 세차해도 돼?", "주말 캠핑 언제가 좋아?" 등 질문을 입력하세요.
+          </div>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1.5">
           <input 
             id="geminiChatInput" 
             type="text" 
-            placeholder="기상 관련 질문을 입력하세요..." 
-            class="flex-1 bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+            placeholder="날씨 질문 입력..." 
+            class="flex-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
           />
           <button 
             id="geminiChatSendBtn"
-            class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs sm:text-sm font-semibold text-white transition flex items-center gap-1 cursor-pointer"
+            class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-semibold text-white transition cursor-pointer flex-shrink-0"
           >
-            <span>전송</span>
+            전송
           </button>
         </div>
       </div>
-    </section>
-
-    <!-- Daily Forecast Tabs -->
-    <section class="glass-panel rounded-3xl p-6 mb-6">
-      <div class="flex items-center justify-between mb-4">
-        <div>
-          <h3 class="text-base font-bold text-white">일자별 중기 예보 (최대 16일)</h3>
-          <p class="text-xs text-slate-400">원하는 날짜를 클릭하면 아래 시간대별 세부 예보가 전환됩니다.</p>
-        </div>
-        <span class="text-xs bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full font-medium border border-indigo-500/30">
-          16일 예측 데이터
-        </span>
-      </div>
-
-      <div id="dailyCardsContainer" class="flex gap-3 overflow-x-auto pb-3 custom-scrollbar"></div>
-    </section>
-
-    <!-- Hourly Forecast Timeline -->
-    <section class="glass-panel rounded-3xl p-6 mb-6">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <div>
-          <h3 class="text-base font-bold text-white">시간대별 세부 예보 & 강수 예측</h3>
-          <p class="text-xs text-slate-400">시간별 날씨, 기온, 강수 확률(%) 및 예상 강수량(mm)</p>
-        </div>
-
-        <div class="flex items-center gap-1 bg-slate-900/80 p-1 rounded-xl border border-white/10 self-start sm:self-auto">
-          <button id="interval1hBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow cursor-pointer">
-            1시간 간격
-          </button>
-          <button id="interval3hBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white cursor-pointer">
-            3시간 간격
-          </button>
-        </div>
-      </div>
-
-      <div id="hourlyTimelineContainer" class="flex gap-3 overflow-x-auto pb-4 custom-scrollbar"></div>
     </section>
 
     <!-- Footer -->
-    <footer class="text-center text-xs text-slate-500 pt-4 border-t border-white/5 space-y-2">
-      <p>글로벌 기상 모델: ECMWF IFS 0.25°, 대한민국 기상청 GDAPS, NOAA GFS, DWD ICON, CMC GEM + Google Gemini AI</p>
-      <p>PWA 오프라인 캐싱 지원 • GitHub Pages 호환 단일 웹 앱</p>
+    <footer class="text-center text-[11px] text-slate-500 pt-2 space-y-1">
+      <p>글로벌 기상 모델: ECMWF IFS, 한국 기상청, NOAA GFS, DWD ICON + Gemini AI</p>
+      <p>PWA 오프라인 지원 • GitHub Pages</p>
     </footer>
 
   </div>
 
   <!-- Gemini API Key Settings Modal -->
   <div id="geminiModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4 hidden">
-    <div class="bg-slate-900 border border-white/10 rounded-3xl max-w-md w-full p-6 shadow-2xl relative">
-      <div class="flex items-center justify-between mb-4">
+    <div class="bg-slate-900 border border-white/10 rounded-3xl max-w-sm w-full p-5 shadow-2xl relative">
+      <div class="flex items-center justify-between mb-3">
         <div class="flex items-center gap-2">
-          <span class="text-xl">🔑</span>
-          <h3 class="text-base font-bold text-white">Gemini API 키 설정</h3>
+          <span class="text-lg">🔑</span>
+          <h3 class="text-sm font-bold text-white">Gemini API 키 설정</h3>
         </div>
-        <button id="geminiCloseModalBtn" class="text-slate-400 hover:text-white text-lg cursor-pointer">✕</button>
+        <button id="geminiCloseModalBtn" class="text-slate-400 hover:text-white text-base cursor-pointer">✕</button>
       </div>
 
-      <p class="text-xs text-slate-300 mb-4 leading-relaxed">
-        Google AI Studio(aistudio.google.com)에서 발급받은 Gemini API 키를 입력하시면 AI 정밀 날씨 브리핑 및 실시간 Q&A 컨설팅을 사용할 수 있습니다.
-        <br><span class="text-slate-500">* 입력하신 키는 브라우저 로컬(localStorage)에만 안전하게 보관됩니다.</span>
+      <p class="text-xs text-slate-300 mb-3 leading-relaxed">
+        Google AI Studio 키를 입력하시면 AI 정밀 날씨 브리핑 및 실시간 Q&A를 사용할 수 있습니다.
       </p>
 
-      <div class="mb-4">
-        <label class="block text-xs font-semibold text-slate-400 mb-1">Gemini API Key</label>
+      <div class="mb-3">
         <input 
           id="geminiApiKeyInput" 
           type="password" 
           placeholder="AIzaSy..." 
-          class="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          class="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
       </div>
 
       <div class="flex items-center justify-end gap-2">
         <button 
           id="geminiSaveKeyBtn" 
-          class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-semibold text-white transition shadow-md cursor-pointer"
+          class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-semibold text-white transition shadow-md cursor-pointer"
         >
           저장하기
         </button>
@@ -332,9 +259,8 @@
 
   <!-- Loading Overlay -->
   <div id="loadingOverlay" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center z-50 hidden">
-    <div class="w-14 h-14 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-4"></div>
-    <div class="text-sm font-semibold text-white">전 세계 기상 모델 데이터 수집 및 앙상블 분석 중...</div>
-    <div class="text-xs text-slate-400 mt-1">ECMWF, GFS, ICON, KMA GDAPS 통합 계산</div>
+    <div class="w-10 h-10 border-3 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-3"></div>
+    <div class="text-xs font-semibold text-white">글로벌 앙상블 기상 데이터 수집 중...</div>
   </div>
 
   <!-- Main JavaScript App -->
