@@ -100,9 +100,18 @@ export const EnsembleEngine = {
       const maxTemp = Math.round(daily.temperature_2m_max[d]);
       const minTemp = Math.round(daily.temperature_2m_min[d]);
       const maxPop = daily.precipitation_probability_max ? Math.round(daily.precipitation_probability_max[d]) : 0;
-      const precipSum = daily.precipitation_sum ? parseFloat(daily.precipitation_sum[d].toFixed(1)) : 0;
-      const code = daily.weather_code[d];
-      const weatherInfo = this.getWeatherInfo(code);
+      let precipSum = daily.precipitation_sum ? parseFloat(daily.precipitation_sum[d].toFixed(1)) : 0;
+      let code = daily.weather_code[d];
+      let weatherInfo = this.getWeatherInfo(code);
+
+      // Harmonize: If precipitation probability is low (<= 20%), prevent rain/thunderstorm anomaly codes
+      if (maxPop <= 20) {
+        if (code >= 51) {
+          code = 2; // partly-cloudy
+          weatherInfo = this.getWeatherInfo(2);
+          precipSum = 0;
+        }
+      }
 
       dailyItems.push({
         date: dateStr,
