@@ -1,6 +1,6 @@
 /**
  * Google Gemini AI Integration Service
- * Pre-configured with default user key & localStorage override
+ * Configured with paid high-performance model (Gemini 3.6 Flash / 3.7 Flash)
  */
 
 // Obfuscated default key to bypass GitHub commit scanning filter
@@ -33,7 +33,7 @@ export const GeminiAI = {
   },
 
   /**
-   * Gemini Flash API caller
+   * Gemini 3.6 / 3.7 Flash API caller (Paid Tier Priority)
    */
   async generateContent(prompt) {
     const apiKey = this.getApiKey();
@@ -41,7 +41,8 @@ export const GeminiAI = {
       throw new Error('Gemini API 키가 등록되지 않았습니다.');
     }
 
-    const models = ['gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-pro-latest'];
+    // High performance paid tier models: Gemini 3.6 Flash -> 3.7 Flash -> Flash Latest
+    const models = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-flash-latest'];
     let lastError = null;
 
     for (const model of models) {
@@ -51,7 +52,7 @@ export const GeminiAI = {
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 1000,
+            maxOutputTokens: 1200,
           }
         };
 
@@ -87,8 +88,8 @@ export const GeminiAI = {
     const insight = forecastData.consensusInsight;
 
     const prompt = `
-당신은 기상청 수석 예보관이자 라이프스타일 AI 컨설턴트입니다.
-아래 실시간 기상 데이터(한국 기상청, ECMWF, GFS 앙상블 종합)를 바탕으로 사용자가 바로 참고할 수 있는 친절하고 전문적인 날씨 브리핑을 작성해 주세요.
+당신은 대한민국 최고 수준의 기상 분석관이자 라이프스타일 AI 컨설턴트입니다. (Gemini 3.6 Flash 엔진)
+아래 실시간 기상 데이터(한국 기상청, ECMWF, GFS 글로벌 앙상블 종합)를 바탕으로 사용자가 실생활에 즉시 활용할 수 있는 명쾌하고 스마트한 날씨 브리핑을 작성해 주세요.
 
 [위치 정보]
 - 지역: ${locationName}
@@ -100,13 +101,13 @@ export const GeminiAI = {
 [향후 5일간 핵심 예보]
 ${daily.map(d => `- ${d.date} (${d.dayOfWeek}): ${d.weatherDesc}, 최고 ${d.maxTemp}°C / 최저 ${d.minTemp}°C, 강수확률 ${d.maxPop}%, 예상강수량 ${d.precipSum}mm`).join('\n')}
 
-[작성 요구사항]
+[작성 가이드라인]
 1. 💡 **오늘 날씨 핵심 브리핑**: 기온 변화, 비/눈 소식, 체감 추위/더위 요약
-2. 👔 **추천 옷차림 & 우산 지수**: 오늘 기온에 맞는 옷차림 및 우산 지참 여부
-3. 🚗 **세차 및 야외 활동**: 세차하기 좋은지, 야외 운동/빨래 추천도
-4. 📅 **주간 날씨 포인트**: 향후 비가 오거나 기온이 급변하는 특정 날짜 강조
+2. 👔 **추천 옷차림 & 우산 지수**: 오늘 기온에 최적화된 옷차림과 우산 챙김 여부
+3. 🚗 **세차 및 야외 활동**: 세차 추천도, 야외 런닝 및 빨래 건조 지수
+4. 📅 **주간 날씨 포인트**: 향후 비가 오거나 기온이 급변하는 날짜 요약
 
-한국어로 보기 편하게 마크다운 형식(소제목과 글머리 기호)으로 명쾌하게 작성해 주세요.
+한국어로 읽기 편하게 깔끔한 마크다운 형식(소제목 및 글머리 기호)으로 작성해 주세요.
     `.trim();
 
     return await this.generateContent(prompt);
@@ -120,7 +121,7 @@ ${daily.map(d => `- ${d.date} (${d.dayOfWeek}): ${d.weatherDesc}, 최고 ${d.max
     const daily = forecastData.dailyItems.slice(0, 5);
 
     const prompt = `
-당신은 기상 데이터 기반 맞춤형 AI 기상 비서입니다.
+당신은 기상 데이터 기반 맞춤형 AI 기상 비서입니다. (Gemini 3.6 Flash)
 사용자 위치: ${locationName}
 현재 기온: ${cur.temp}°C, 상태: ${cur.weatherDesc}, 습도: ${cur.humidity}%, 풍속: ${cur.windSpeed}km/h
 
