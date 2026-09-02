@@ -1,6 +1,6 @@
 /**
  * Google Gemini AI Integration Service
- * Configured with paid high-performance model (Gemini 3.6 Flash / 3.7 Flash)
+ * Configured with Paid Gemini 3.6 Flash / 3.7 Flash & Meteorological Reasoning Logic
  */
 
 // Obfuscated default key to bypass GitHub commit scanning filter
@@ -33,7 +33,7 @@ export const GeminiAI = {
   },
 
   /**
-   * Gemini 3.6 / 3.7 Flash API caller (Paid Tier Priority)
+   * Gemini 3.6 / 3.7 Flash API caller
    */
   async generateContent(prompt) {
     const apiKey = this.getApiKey();
@@ -41,7 +41,6 @@ export const GeminiAI = {
       throw new Error('Gemini API 키가 등록되지 않았습니다.');
     }
 
-    // High performance paid tier models: Gemini 3.6 Flash -> 3.7 Flash -> Flash Latest
     const models = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-flash-latest'];
     let lastError = null;
 
@@ -51,8 +50,8 @@ export const GeminiAI = {
         const body = {
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1200,
+            temperature: 0.5,
+            maxOutputTokens: 2048, // 충분한 토큰으로 말 끊김 방지
           }
         };
 
@@ -88,26 +87,33 @@ export const GeminiAI = {
     const insight = forecastData.consensusInsight;
 
     const prompt = `
-당신은 대한민국 최고 수준의 기상 분석관이자 라이프스타일 AI 컨설턴트입니다. (Gemini 3.6 Flash 엔진)
-아래 실시간 기상 데이터(한국 기상청, ECMWF, GFS 글로벌 앙상블 종합)를 바탕으로 사용자가 실생활에 즉시 활용할 수 있는 명쾌하고 스마트한 날씨 브리핑을 작성해 주세요.
+당신은 대한민국 최고 수준의 전문 기상 분석관이자 실생활 컨설턴트입니다. (Gemini 3.6 Flash 엔진)
+아래 기상 데이터를 종합 분석하여 실생활에 꼭 필요한 맞춤 브리핑을 작성해 주세요.
 
 [위치 정보]
 - 지역: ${locationName}
 - 현재 기온: ${cur.temp}°C (체감 ${cur.apparentTemp}°C)
-- 현재 날씨: ${cur.weatherDesc}
+- 현재 상태: ${cur.weatherDesc}
 - 습도: ${cur.humidity}%, 풍속: ${cur.windSpeed}km/h
 - 글로벌 모델 종합 일치도: ${insight.agreementLevel} (${insight.summaryText})
 
 [향후 5일간 핵심 예보]
 ${daily.map(d => `- ${d.date} (${d.dayOfWeek}): ${d.weatherDesc}, 최고 ${d.maxTemp}°C / 최저 ${d.minTemp}°C, 강수확률 ${d.maxPop}%, 예상강수량 ${d.precipSum}mm`).join('\n')}
 
-[작성 가이드라인]
-1. 💡 **오늘 날씨 핵심 브리핑**: 기온 변화, 비/눈 소식, 체감 추위/더위 요약
-2. 👔 **추천 옷차림 & 우산 지수**: 오늘 기온에 최적화된 옷차림과 우산 챙김 여부
-3. 🚗 **세차 및 야외 활동**: 세차 추천도, 야외 런닝 및 빨래 건조 지수
-4. 📅 **주간 날씨 포인트**: 향후 비가 오거나 기온이 급변하는 날짜 요약
+[예보 분석 핵심 지침]
+1. **강수 확률(PoP %) 최우선 판단**: 
+   - 강수확률이 0~20%이면 비가 안 올 확률이 80~90% 이상이므로 "비 걱정 없이 맑거나 구름, 야외 활동/러닝/세차 적합"으로 판단하세요.
+   - 강수확률이 30~50%이면 "약간의 변동성, 우산 준비 권장"
+   - 강수확률이 60% 이상일 때만 "우천/야외활동 자제"로 판단하세요.
+2. **토큰 끊김 방지**: 문장을 끝까지 완성하여 결론을 명확히 맺으세요.
 
-한국어로 읽기 편하게 깔끔한 마크다운 형식(소제목 및 글머리 기호)으로 작성해 주세요.
+[작성 포맷]
+1. 💡 **오늘 날씨 핵심 요약**: 기온, 체감온도, 비 소식
+2. 👔 **옷차림 & 준비물 추천**: 기온별 복장 및 우산 필요 여부
+3. 🚗 **생활 활동 가이드**: 세차 및 야외 운동/러닝 적합도
+4. 📅 **주간 날씨 포인트**: 향후 비가 오거나 기온이 변하는 날짜
+
+한국어 마크다운으로 문장이 끊기지 않게 자연스럽게 작성해 주세요.
     `.trim();
 
     return await this.generateContent(prompt);
@@ -118,19 +124,26 @@ ${daily.map(d => `- ${d.date} (${d.dayOfWeek}): ${d.weatherDesc}, 최고 ${d.max
    */
   async askQuestion(question, forecastData, locationName) {
     const cur = forecastData.current;
-    const daily = forecastData.dailyItems.slice(0, 5);
+    const daily = forecastData.dailyItems.slice(0, 7);
 
     const prompt = `
-당신은 기상 데이터 기반 맞춤형 AI 기상 비서입니다. (Gemini 3.6 Flash)
+당신은 기상 데이터 기반 맞춤형 AI 전문 기상 비서입니다. (Gemini 3.6 Flash)
 사용자 위치: ${locationName}
 현재 기온: ${cur.temp}°C, 상태: ${cur.weatherDesc}, 습도: ${cur.humidity}%, 풍속: ${cur.windSpeed}km/h
 
-[향후 5일 예보]
-${daily.map(d => `${d.date}(${d.dayOfWeek}): ${d.weatherDesc}, 최고 ${d.maxTemp}°/최저 ${d.minTemp}°, 강수확률 ${d.maxPop}%, 강수량 ${d.precipSum}mm`).join(', ')}
+[향후 일주일 예보 데이터]
+${daily.map(d => `${d.date}(${d.dayOfWeek}): 상태 '${d.weatherDesc}', 최고 ${d.maxTemp}°/최저 ${d.minTemp}°, 강수확률 ${d.maxPop}%, 예상강수량 ${d.precipSum}mm`).join('\n')}
 
 사용자 질문: "${question}"
 
-위 실제 기상 예보 데이터를 바탕으로 사용자의 질문에 대해 친절하고 명확하게 답변해 주세요 (2~3문장 내외로 핵심 위주).
+[답변 가이드라인 - 엄격 준수]
+1. **강수 확률(%) 기준 상식적 판단**:
+   - 강수확률이 10~20% 이하이면 비가 올 가능성이 매우 희박하므로, "야외 러닝이나 외출, 세차 모두 충분히 가능합니다"라고 명쾌하게 긍정 답변을 하세요.
+   - 일부 수치예보 모델의 잔여값으로 강수량이 적혀 있더라도 확률이 낮으면 "비가 오지 않을 확률이 80~90%로 훨씬 높으므로 안심하고 활동하셔도 좋습니다"라고 설명하세요.
+   - 강수확률이 60% 이상일 때만 야외 활동 자제를 권장하세요.
+2. **답변 길이 및 문장 완결**:
+   - 2~3문장 내외로 군더더기 없이 친절하고 명확하게 끝맺으세요.
+   - 문장이 도중에 잘리거나 끊기지 않도록 완결된 문장으로만 답변하세요.
     `.trim();
 
     return await this.generateContent(prompt);
