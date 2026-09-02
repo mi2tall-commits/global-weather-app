@@ -148,7 +148,7 @@ class WeatherApp {
     this.renderFavorites();
     this.updateGeminiKeyStatus();
 
-    // 1. Instant Location Detection (Fast IP / Cache)
+    // 1. Instant Location Detection
     const initialLoc = await GeoService.getInitialLocation();
     this.currentLocation = initialLoc;
 
@@ -183,7 +183,7 @@ class WeatherApp {
       localStorage.setItem('last_user_location', JSON.stringify(loc));
       await this.loadWeather(coords.latitude, coords.longitude, geoInfo.name, geoInfo.country);
     } catch (err) {
-      alert(err.message || 'GPS 위치를 불러오는 중 오류가 발생했습니다.');
+      console.warn('GPS 핸들러 예외:', err);
     } finally {
       this.showLoading(false);
     }
@@ -243,7 +243,6 @@ class WeatherApp {
         this.elements.locationSub.textContent = country ? `${country} • 위도 ${lat.toFixed(2)}°, 경도 ${lon.toFixed(2)}°` : `위도 ${lat.toFixed(2)}°, 경도 ${lon.toFixed(2)}°`;
       }
 
-      // Fast parallel fetch (<200ms)
       const [forecastRaw, airQualityRaw] = await Promise.all([
         WeatherAPI.getForecast(lat, lon),
         WeatherAPI.getAirQuality(lat, lon),
@@ -266,7 +265,6 @@ class WeatherApp {
       this.renderAll();
     } catch (err) {
       console.error('날씨 데이터 로드 실패:', err);
-      alert('날씨 데이터를 가져오는 중 오류가 발생했습니다: ' + err.message);
     } finally {
       this.showLoading(false);
     }
