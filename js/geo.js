@@ -1,11 +1,11 @@
 /**
  * Geolocation and Address Management Module
- * Optimized for Safari iOS/macOS & Instant IP-based Fallback
+ * Ultra-resilient Safari iOS / Mobile GPS with Smart IP Fallback
  */
 
 export const GeoService = {
   DEFAULT_LOCATION: {
-    name: '현재 위치 파악 중...',
+    name: '현재 위치',
     country: '대한민국',
     latitude: 37.5665,
     longitude: 126.9780,
@@ -13,90 +13,101 @@ export const GeoService = {
   },
 
   /**
-   * Fast IP-based initial geolocation (Zero-delay, works in Safari without permission blocks)
+   * Fast IP Geolocation (Always works as a reliable backup)
    */
-  async getInitialLocation() {
-    // 1. Check last saved location in localStorage
-    try {
-      const saved = localStorage.getItem('last_user_location');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {}
-
-    // 2. Fast IP Geolocation (50ms response)
+  async getIpLocation() {
     try {
       const res = await fetch('https://get.geojs.io/v1/ip/geo.json');
       if (res.ok) {
         const data = await res.json();
-        const lat = parseFloat(data.latitude);
-        const lon = parseFloat(data.longitude);
-        const cityName = data.city || data.region || '현재 위치';
-        const country = data.country || '대한민국';
-        const loc = {
-          name: `${cityName}`,
-          country: country,
-          latitude: lat,
-          longitude: lon,
+        return {
+          name: data.city || data.region || '현재 위치',
+          country: data.country || '대한민국',
+          latitude: parseFloat(data.latitude),
+          longitude: parseFloat(data.longitude),
           timezone: data.timezone || 'auto',
+          isIp: true,
         };
-        localStorage.setItem('last_user_location', JSON.stringify(loc));
-        return loc;
       }
-    } catch (err) {
-      console.warn('IP Geolocation fallback failed:', err);
-    }
+    } catch (e) {}
 
-    return {
-      name: '서울특별시 중구',
-      country: '대한민국',
-      latitude: 37.5665,
-      longitude: 126.9780,
-      timezone: 'Asia/Seoul',
-    };
+    try {
+      const res2 = await fetch('https://ipapi.co/json/');
+      if (res2.ok) {
+        const data = await res2.json();
+        return {
+          name: data.city || data.region || '현재 위치',
+          country: data.country_name || '대한민국',
+          latitude: parseFloat(data.latitude),
+          longitude: parseFloat(data.longitude),
+          timezone: data.timezone || 'auto',
+          isIp: true,
+        };
+      }
+    } catch (e) {}
+
+    return this.DEFAULT_LOCATION;
   },
 
   /**
-   * Accurate GPS position via browser Geolocation API (Optimized for Safari)
+   * Fast initial location
+   */
+  async getInitialLocation() {
+    try {
+      const saved = localStorage.getItem('last_user_location');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+
+    return await this.getIpLocation();
+  },
+
+  /**
+   * iOS Safari Optimized GPS Position
+   * Tries fast cached GPS -> Precise GPS -> IP Fallback (Zero crash guarantee)
    */
   async getCurrentPosition() {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('브라우저가 GPS 위치 서비스를 지원하지 않습니다.'));
-        return;
-      }
+    if (!navigator.geolocation) {
+      return await this.getIpLocation();
+    }
 
-      // Fast resolution with reasonable accuracy to prevent Safari 10s GPS lag
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          resolve({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-          });
-        },
-        (error) => {
-          let message = '위치 정보를 가져올 수 없습니다.';
-          switch (error.code) {
-            case error.PERMISSION_DENIED:
-              message = '사파리(브라우저) 위치 권한이 비활성화되어 있습니다. 설정에서 위치 접근을 허용해 주시거나 검색을 이용해 주세요.';
-              break;
-            case error.POSITION_UNAVAILABLE:
-              message = '현재 GPS 위치 신호를 잡을 수 없습니다.';
-              break;
-            case error.TIMEOUT:
-              message = 'GPS 응답 시간이 초과되었습니다.';
-              break;
-          }
-          reject(new Error(message));
-        },
-        { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 }
-      );
-    });
+    // Promise wrapper with graceful timeout
+    const tryGetPos = (options) => {
+      return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+            isGps: true,
+          }),
+          (err) => reject(err),
+          options
+        );
+      });
+    };
+
+    try {
+      // 1. First attempt: Fast network/cell location (Low battery, fast on iOS)
+      return await tryGetPos({ enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 });
+    } catch (err1) {
+      try {
+        // 2. Second attempt: Direct hardware GPS
+        return await tryGetPos({ enableHighAccuracy: true, timeout: 8000, maximumAge: 0 });
+      } catch (err2) {
+        console.warn('GPS 응답 지연/제한으로 IP 정밀 위치로 대체합니다:', err2);
+        // 3. Third attempt: Seamless IP fallback (never show breaking alert)
+        const ipLoc = await this.getIpLocation();
+        return {
+          latitude: ipLoc.latitude,
+          longitude: ipLoc.longitude,
+          isIpFallback: true,
+        };
+      }
+    }
   },
 
   /**
-   * Reverse Geocoding with fast Korean address parsing
+   * Reverse Geocoding with Korean administrative district mapping
    */
   async reverseGeocode(lat, lon) {
     try {
@@ -112,7 +123,7 @@ export const GeoService = {
 
     try {
       const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=ko`;
-      const res = await fetch(url, { headers: { 'User-Agent': 'GlobalWeatherConsensusApp/1.1' } });
+      const res = await fetch(url, { headers: { 'User-Agent': 'GlobalWeatherConsensusApp/1.2' } });
       if (res.ok) {
         const data = await res.json();
         const addr = data.address || {};
