@@ -2,7 +2,7 @@
  * Service Worker with Network-First Strategy for Instant App Updates
  */
 
-const CACHE_NAME = 'global-weather-v2.5';
+const CACHE_NAME = 'global-weather-v2.6';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -23,7 +23,6 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Network-first for everything to prevent stale cache on updates
   event.respondWith(
     fetch(event.request)
       .then((response) => {
