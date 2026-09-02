@@ -8,8 +8,8 @@ class WeatherApp {
     this.currentLocation = GeoService.DEFAULT_LOCATION;
     this.forecastData = null;
     this.airQualityData = null;
-    this.hourlyInterval = 3; // default 3-hour interval for comfortable readability
-    this.expandedDate = null; // Currently expanded day's date string
+    this.hourlyInterval = 3; // default 3-hour interval
+    this.expandedDate = null; // Date string of currently expanded day
     this.searchDebounceTimer = null;
 
     this.initElements();
@@ -52,6 +52,11 @@ class WeatherApp {
       interval1hBtn: document.getElementById('interval1hBtn'),
       interval3hBtn: document.getElementById('interval3hBtn'),
 
+      // Quick Day Switcher Tabs
+      tabTodayBtn: document.getElementById('tabTodayBtn'),
+      tabTomorrowBtn: document.getElementById('tabTomorrowBtn'),
+      tabDay3Btn: document.getElementById('tabDay3Btn'),
+
       // Vertical Weekly Accordion List
       verticalWeeklyList: document.getElementById('verticalWeeklyList'),
 
@@ -80,11 +85,11 @@ class WeatherApp {
       this.elements.searchInput.addEventListener('input', (e) => {
         clearTimeout(this.searchDebounceTimer);
         const query = e.target.value.trim();
-        if (query.length < 2) {
+        if (query.length < 1) {
           if (this.elements.searchResults) this.elements.searchResults.classList.add('hidden');
           return;
         }
-        this.searchDebounceTimer = setTimeout(() => this.handleSearch(query), 250);
+        this.searchDebounceTimer = setTimeout(() => this.handleSearch(query), 200);
       });
     }
 
@@ -99,6 +104,17 @@ class WeatherApp {
     if (this.elements.interval1hBtn) this.elements.interval1hBtn.addEventListener('click', () => this.setInterval(1));
     if (this.elements.interval3hBtn) this.elements.interval3hBtn.addEventListener('click', () => this.setInterval(3));
     if (this.elements.favBtn) this.elements.favBtn.addEventListener('click', () => this.toggleFavorite());
+
+    // Quick Day Tabs
+    if (this.elements.tabTodayBtn) {
+      this.elements.tabTodayBtn.addEventListener('click', () => this.expandDayByIndex(0));
+    }
+    if (this.elements.tabTomorrowBtn) {
+      this.elements.tabTomorrowBtn.addEventListener('click', () => this.expandDayByIndex(1));
+    }
+    if (this.elements.tabDay3Btn) {
+      this.elements.tabDay3Btn.addEventListener('click', () => this.expandDayByIndex(2));
+    }
 
     // Gemini AI Events
     if (this.elements.geminiSettingsBtn) this.elements.geminiSettingsBtn.addEventListener('click', () => this.openGeminiModal());
@@ -116,7 +132,10 @@ class WeatherApp {
   initServiceWorker() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js')
-        .then(() => console.log('Service Worker 등록 완료'))
+        .then((reg) => {
+          reg.update();
+          console.log('Service Worker 등록 및 업데이트 완료');
+        })
         .catch((err) => console.warn('Service Worker 등록 실패:', err));
     }
   }
@@ -371,12 +390,40 @@ class WeatherApp {
     this.renderVerticalWeeklyList();
   }
 
+  expandDayByIndex(idx) {
+    if (!this.forecastData?.dailyItems || !this.forecastData.dailyItems[idx]) return;
+    this.expandedDate = this.forecastData.dailyItems[idx].date;
+    this.renderVerticalWeeklyList();
+  }
+
+  updateQuickTabStyles() {
+    if (!this.forecastData?.dailyItems) return;
+    const todayDate = this.forecastData.dailyItems[0]?.date;
+    const tomorrowDate = this.forecastData.dailyItems[1]?.date;
+    const day3Date = this.forecastData.dailyItems[2]?.date;
+
+    const activeClass = 'flex-1 py-1.5 rounded-xl bg-indigo-600 text-white shadow transition cursor-pointer text-center font-bold';
+    const inactiveClass = 'flex-1 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition cursor-pointer text-center';
+
+    if (this.elements.tabTodayBtn) {
+      this.elements.tabTodayBtn.className = this.expandedDate === todayDate ? activeClass : inactiveClass;
+    }
+    if (this.elements.tabTomorrowBtn) {
+      this.elements.tabTomorrowBtn.className = this.expandedDate === tomorrowDate ? activeClass : inactiveClass;
+    }
+    if (this.elements.tabDay3Btn) {
+      this.elements.tabDay3Btn.className = this.expandedDate === day3Date ? activeClass : inactiveClass;
+    }
+  }
+
   /**
    * 세로형 주간 예보 및 클릭 시 시간대별 아코디언 펼침 렌더러
    */
   renderVerticalWeeklyList() {
     if (!this.elements.verticalWeeklyList || !this.forecastData) return;
     const days = this.forecastData.dailyItems;
+
+    this.updateQuickTabStyles();
 
     const allMin = Math.min(...days.map(d => d.minTemp));
     const allMax = Math.max(...days.map(d => d.maxTemp));
@@ -403,27 +450,51 @@ class WeatherApp {
         const filtered = dayHours.filter((_, i) => i % step === 0);
 
         hourlyContent = `
-          <div class="accordion-expanded-area mt-2.5 mb-1 p-3 rounded-2xl bg-slate-950/90 border border-indigo-500/20 shadow-inner space-y-2" onclick="event.stopPropagation()">
-            <div class="flex items-center justify-between text-[11px] text-indigo-300 font-semibold px-1">
+          <div class="accordion-expanded-area mt-3 mb-1 p-3 rounded-2xl bg-slate-950/95 border border-indigo-500/30 shadow-2xl space-y-2" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between text-xs text-indigo-300 font-bold px-1 pb-2 border-b border-white/10">
               <span>🕒 ${dayLabel} (${day.date.substring(5)}) 시간대별 상세 예보</span>
-              <span class="text-slate-400 font-normal">총 강수량: ${day.precipSum > 0 ? day.precipSum + 'mm' : '0mm'}</span>
+              <span class="text-slate-400 text-[11px] font-normal">총 강수량: ${day.precipSum > 0 ? day.precipSum + 'mm' : '없음'}</span>
             </div>
 
-            <!-- Grid Hourly Cards -->
-            <div class="grid grid-cols-4 sm:grid-cols-8 gap-1.5 pt-1">
+            <!-- Table Header -->
+            <div class="flex items-center justify-between px-2 text-[10px] text-slate-400 font-medium pb-1">
+              <span class="w-14 text-left">시간</span>
+              <span class="w-24 text-left">날씨</span>
+              <span class="w-16 text-center">기온</span>
+              <span class="w-20 text-right">강수확률 / 량</span>
+              <span class="w-12 text-right">바람</span>
+            </div>
+
+            <!-- Vertical List Rows (한 줄씩 세로로 나열) -->
+            <div class="space-y-1.5 pt-1">
               ${filtered.map(h => {
-                const hPopColor = h.pop >= 60 ? 'text-cyan-400 font-bold' : h.pop >= 30 ? 'text-cyan-300' : 'text-slate-400';
-                const precipBarHeight = Math.min(Math.max(h.precip * 5, h.pop > 30 ? 3 : 0), 24);
+                const hPopColor = h.pop >= 60 ? 'text-cyan-400 font-bold' : h.pop >= 30 ? 'text-cyan-300 font-medium' : 'text-slate-500';
+                const precipText = h.precip > 0 ? `${h.precip}mm` : '-';
                 return `
-                  <div class="p-2 rounded-xl bg-white/5 border border-white/5 flex flex-col items-center justify-between text-center">
-                    <span class="text-[10px] text-slate-400 font-medium">${h.hour}시</span>
-                    <span class="text-xl my-1" title="${h.weatherDesc}">${h.weatherIcon}</span>
-                    <span class="text-xs font-bold text-white">${h.temp}°</span>
-                    <div class="mt-1 flex flex-col items-center">
-                      <span class="text-[9px] ${hPopColor}">💧${h.pop}%</span>
-                      <div class="w-2.5 bg-cyan-500 rounded-t mt-0.5" style="height: ${precipBarHeight}px"></div>
-                      <span class="text-[8px] text-slate-500 font-mono mt-0.5">${h.precip > 0 ? h.precip + 'm' : '-'}</span>
+                  <div class="flex items-center justify-between p-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs transition border border-white/5">
+                    <!-- 1. Time -->
+                    <span class="w-14 font-semibold text-slate-200">${h.hour}:00</span>
+
+                    <!-- 2. Weather Icon + Desc -->
+                    <div class="flex items-center gap-1.5 w-24 text-left truncate">
+                      <span class="text-lg">${h.weatherIcon}</span>
+                      <span class="text-slate-300 text-[11px] truncate">${h.weatherDesc}</span>
                     </div>
+
+                    <!-- 3. Temp -->
+                    <div class="w-16 text-center">
+                      <span class="font-bold text-white text-sm">${h.temp}°</span>
+                      <span class="text-[10px] text-slate-400 block -mt-0.5">체감 ${h.apparentTemp}°</span>
+                    </div>
+
+                    <!-- 4. Rain Probability & Amount -->
+                    <div class="w-20 text-right">
+                      <div class="${hPopColor} text-[11px]">💧 ${h.pop}%</div>
+                      <div class="text-[10px] text-slate-400 font-mono">${precipText}</div>
+                    </div>
+
+                    <!-- 5. Wind -->
+                    <span class="w-12 text-right text-[10px] text-slate-400 font-mono">💨 ${h.windSpeed}k</span>
                   </div>
                 `;
               }).join('')}
