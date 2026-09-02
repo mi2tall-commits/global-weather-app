@@ -1,71 +1,72 @@
-/* Modern Global Weather Application Styles */
+/* 날씨날씨 스타일 모바일 최적화 세로형 테마 */
 
 :root {
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-sans: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 body {
   font-family: var(--font-sans);
   min-height: 100vh;
-  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+  background: linear-gradient(180deg, #0b1120 0%, #0f172a 40%, #1e1b4b 100%);
   color: #f8fafc;
   overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* Glassmorphism card styles */
-.glass-panel {
-  background: rgba(30, 41, 59, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 10px 30px 0 rgba(0, 0, 0, 0.3);
-}
-
-.glass-card {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+/* Card panel styles */
+.weather-card {
+  background: rgba(30, 41, 59, 0.65);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.5rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
 }
 
-.glass-card:hover {
-  background: rgba(255, 255, 255, 0.09);
-  border-color: rgba(255, 255, 255, 0.2);
+.weather-subcard {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 /* Custom Scrollbar for horizontal timeline */
 .custom-scrollbar::-webkit-scrollbar {
-  height: 6px;
-  width: 6px;
+  height: 5px;
+  width: 5px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 9999px;
+  background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 9999px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.3);
 }
 
-/* Pulse badge animation */
-@keyframes softPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.85; transform: scale(1.02); }
+/* Temperature range bar for vertical weekly list */
+.temp-bar-bg {
+  background: rgba(255, 255, 255, 0.1);
+  height: 6px;
+  border-radius: 9999px;
+  position: relative;
 }
 
-.pulse-badge {
-  animation: softPulse 2.5s infinite ease-in-out;
+.temp-bar-fill {
+  position: absolute;
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #38bdf8 0%, #818cf8 50%, #f43f5e 100%);
 }
 
 /* Rain precipitation bar */
 .precip-bar {
-  transition: height 0.4s ease-out;
+  transition: height 0.3s ease-out;
 }
 
-/* Interactive transitions */
+/* Transitions */
 button, input, a {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
