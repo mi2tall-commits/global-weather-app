@@ -403,23 +403,27 @@ class WeatherApp {
         const filtered = dayHours.filter((_, i) => i % step === 0);
 
         hourlyContent = `
-          <div class="mt-2.5 mb-1 p-3 rounded-2xl bg-slate-950/80 border border-white/5 space-y-2.5 animate-fadeIn">
+          <div class="accordion-expanded-area mt-2.5 mb-1 p-3 rounded-2xl bg-slate-950/90 border border-indigo-500/20 shadow-inner space-y-2" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between text-[11px] text-indigo-300 font-semibold px-1">
-              <span>🕒 ${dayLabel} 시간대별 상세 (${this.hourlyInterval}시간 간격)</span>
-              <span class="text-slate-400 font-normal">강수량: ${day.precipSum > 0 ? day.precipSum + 'mm' : '없음'}</span>
+              <span>🕒 ${dayLabel} (${day.date.substring(5)}) 시간대별 상세 예보</span>
+              <span class="text-slate-400 font-normal">총 강수량: ${day.precipSum > 0 ? day.precipSum + 'mm' : '0mm'}</span>
             </div>
 
-            <!-- Horizontal / Grid Timeline inside expanded day -->
+            <!-- Grid Hourly Cards -->
             <div class="grid grid-cols-4 sm:grid-cols-8 gap-1.5 pt-1">
               ${filtered.map(h => {
-                const hPopColor = h.pop >= 60 ? 'text-cyan-400 font-bold' : h.pop >= 30 ? 'text-cyan-300' : 'text-slate-500';
+                const hPopColor = h.pop >= 60 ? 'text-cyan-400 font-bold' : h.pop >= 30 ? 'text-cyan-300' : 'text-slate-400';
+                const precipBarHeight = Math.min(Math.max(h.precip * 5, h.pop > 30 ? 3 : 0), 24);
                 return `
-                  <div class="p-2 rounded-xl weather-subcard flex flex-col items-center justify-between text-center">
+                  <div class="p-2 rounded-xl bg-white/5 border border-white/5 flex flex-col items-center justify-between text-center">
                     <span class="text-[10px] text-slate-400 font-medium">${h.hour}시</span>
                     <span class="text-xl my-1" title="${h.weatherDesc}">${h.weatherIcon}</span>
                     <span class="text-xs font-bold text-white">${h.temp}°</span>
-                    <span class="text-[9px] ${hPopColor} mt-1">💧${h.pop}%</span>
-                    <span class="text-[8px] text-slate-400 font-mono">${h.precip > 0 ? h.precip + 'm' : '-'}</span>
+                    <div class="mt-1 flex flex-col items-center">
+                      <span class="text-[9px] ${hPopColor}">💧${h.pop}%</span>
+                      <div class="w-2.5 bg-cyan-500 rounded-t mt-0.5" style="height: ${precipBarHeight}px"></div>
+                      <span class="text-[8px] text-slate-500 font-mono mt-0.5">${h.precip > 0 ? h.precip + 'm' : '-'}</span>
+                    </div>
                   </div>
                 `;
               }).join('')}
@@ -428,13 +432,15 @@ class WeatherApp {
         `;
       }
 
+      const activeRowBg = isExpanded ? 'bg-indigo-950/40 border border-indigo-500/30' : 'hover:bg-white/5';
+
       return `
-        <div class="py-2.5 cursor-pointer rounded-2xl transition hover:bg-white/5" data-date="${day.date}">
-          <!-- Day Summary Row -->
-          <div class="flex items-center justify-between gap-2 px-2 text-xs">
+        <div class="py-2 px-1.5 rounded-2xl transition ${activeRowBg}">
+          <!-- Day Summary Header (Clickable Trigger) -->
+          <div class="day-toggle-btn flex items-center justify-between gap-2 p-1.5 cursor-pointer rounded-xl select-none" data-date="${day.date}">
             <!-- 1. Day of week & date -->
             <div class="w-20 text-left flex items-center gap-1.5">
-              <span class="text-[10px] text-slate-500 transition-transform ${isExpanded ? 'rotate-90 text-indigo-400' : ''}">▶</span>
+              <span class="text-[10px] text-indigo-400 transition-transform ${isExpanded ? 'rotate-90' : ''}">▶</span>
               <div>
                 <div class="${dayClass}">${dayLabel}</div>
                 <div class="text-[10px] text-slate-400">${day.date.substring(5)}</div>
@@ -466,15 +472,16 @@ class WeatherApp {
       `;
     }).join('');
 
-    // Attach click listeners to accordion rows
-    this.elements.verticalWeeklyList.querySelectorAll('div[data-date]').forEach(row => {
-      row.addEventListener('click', (e) => {
-        // Prevent click when selecting text
-        const targetDate = row.getAttribute('data-date');
+    // Attach click listener ONLY to the header button
+    this.elements.verticalWeeklyList.querySelectorAll('.day-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const targetDate = btn.getAttribute('data-date');
         if (this.expandedDate === targetDate) {
           this.expandedDate = null; // collapse
         } else {
-          this.expandedDate = targetDate; // expand
+          this.expandedDate = targetDate; // expand clicked day
         }
         this.renderVerticalWeeklyList();
       });
