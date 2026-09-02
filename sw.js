@@ -1,30 +1,11 @@
 /**
- * Service Worker for Offline Caching and PWA support
+ * Service Worker with Network-First Strategy for Instant App Updates
  */
 
-const CACHE_NAME = 'global-weather-v1.1';
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './css/styles.css',
-  './js/app.js',
-  './js/api.js',
-  './js/ensemble.js',
-  './js/geo.js',
-  './js/ai.js',
-  './manifest.json',
-  'https://cdn.tailwindcss.com',
-  'https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap'
-];
+const CACHE_NAME = 'global-weather-v2.5';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE).catch(err => {
-        console.warn('일부 정적 파일 캐시 실패(무시 가능):', err);
-      });
-    }).then(() => self.skipWaiting())
-  );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -42,35 +23,18 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  const url = event.request.url;
-
-  // For weather API requests, try network first, fallback to cached response if offline
-  if (url.includes('open-meteo.com') || url.includes('nominatim') || url.includes('bigdatacloud')) {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          if (response.status === 200) {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseClone);
-            });
-          }
-          return response;
-        })
-        .catch(() => {
-          return caches.match(event.request);
-        })
-    );
-    return;
-  }
-
-  // For static assets, Cache First with Network Fallback
+  // Network-first for everything to prevent stale cache on updates
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request);
-    })
+    fetch(event.request)
+      .then((response) => {
+        if (response.status === 200 && event.request.method === 'GET') {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      })
+      .catch(() => {
+        return caches.match(event.request);
+      })
   );
 });
