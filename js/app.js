@@ -196,12 +196,12 @@ class WeatherApp {
 
     this.elements.searchResults.innerHTML = results.map(r => `
       <div class="p-2.5 hover:bg-white/10 cursor-pointer border-b border-white/5 last:border-0 flex items-center justify-between text-left transition"
-           data-lat="${r.latitude}" data-lon="${r.longitude}" data-name="${r.name}" data-country="${r.country || ''}" data-admin="${r.admin1 || ''}">
-        <div>
-          <div class="font-medium text-white text-xs sm:text-sm">${r.name}</div>
-          <div class="text-[11px] text-slate-400">${[r.admin1, r.country].filter(Boolean).join(', ')}</div>
+           data-lat="${r.latitude}" data-lon="${r.longitude}" data-name="${r.name}" data-sub="${r.subText}" data-country="${r.country || ''}">
+        <div class="truncate mr-2">
+          <div class="font-medium text-white text-xs sm:text-sm truncate">${r.name}</div>
+          <div class="text-[11px] text-slate-400 truncate">${r.subText}</div>
         </div>
-        <span class="text-[11px] text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">선택</span>
+        <span class="text-[11px] text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded flex-shrink-0">선택</span>
       </div>
     `).join('');
 
@@ -210,16 +210,15 @@ class WeatherApp {
         const lat = parseFloat(item.getAttribute('data-lat'));
         const lon = parseFloat(item.getAttribute('data-lon'));
         const name = item.getAttribute('data-name');
+        const sub = item.getAttribute('data-sub');
         const country = item.getAttribute('data-country');
-        const admin = item.getAttribute('data-admin');
-        const fullName = admin ? `${admin} ${name}` : name;
 
         if (this.elements.searchInput) this.elements.searchInput.value = '';
         this.elements.searchResults.classList.add('hidden');
         
-        const loc = { name: fullName, country, latitude: lat, longitude: lon };
+        const loc = { name, country: sub || country, latitude: lat, longitude: lon };
         localStorage.setItem('last_user_location', JSON.stringify(loc));
-        this.loadWeather(lat, lon, fullName, country);
+        this.loadWeather(lat, lon, name, sub || country);
       });
     });
 
