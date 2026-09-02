@@ -1,7 +1,7 @@
-import { WeatherAPI } from './api.js';
-import { EnsembleEngine } from './ensemble.js';
-import { GeoService } from './geo.js';
-import { GeminiAI } from './ai.js';
+import { WeatherAPI } from './api.js?v=2.6';
+import { EnsembleEngine } from './ensemble.js?v=2.6';
+import { GeoService } from './geo.js?v=2.6';
+import { GeminiAI } from './ai.js?v=2.6';
 
 class WeatherApp {
   constructor() {
