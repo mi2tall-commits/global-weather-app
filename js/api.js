@@ -1,6 +1,6 @@
 /**
- * Global Weather API Service
- * High-performance, low-latency API communication with intelligent caching
+ * Global Weather & Micro-Neighborhood Geocoding Service
+ * Supports Korean Dong/Eup/Myeon/Ri level address search + Global cities
  */
 
 export const WeatherAPI = {
@@ -8,8 +8,8 @@ export const WeatherAPI = {
   AIR_QUALITY_URL: 'https://air-quality-api.open-meteo.com/v1/air-quality',
   GEOCODING_URL: 'https://geocoding-api.open-meteo.com/v1/search',
 
-  CACHE_PREFIX: 'weather_cache_v2_',
-  CACHE_TTL_MS: 10 * 60 * 1000, // 10 minutes cache
+  CACHE_PREFIX: 'weather_cache_v3_',
+  CACHE_TTL_MS: 10 * 60 * 1000, // 10 minutes
 
   saveToCache(key, data) {
     try {
@@ -33,12 +33,10 @@ export const WeatherAPI = {
   },
 
   /**
-   * Ultra-fast Forecast fetch (100~200ms response time)
+   * Ultra-fast Forecast fetch (100~200ms)
    */
   async getForecast(lat, lon, timezone = 'auto') {
     const cacheKey = `forecast_${lat.toFixed(2)}_${lon.toFixed(2)}`;
-    
-    // Check fresh cache first for instantaneous render
     const cached = this.getFromCache(cacheKey);
     if (cached) {
       cached.data._isCached = true;
@@ -95,7 +93,6 @@ export const WeatherAPI = {
       data._isCached = false;
       return data;
     } catch (err) {
-      // If offline or failed, fallback to any existing cache
       const oldCache = this.getFromCache(cacheKey, 7 * 24 * 3600 * 1000);
       if (oldCache) {
         oldCache.data._isCached = true;
@@ -107,7 +104,7 @@ export const WeatherAPI = {
   },
 
   /**
-   * Fast Air Quality fetch (PM10, PM2.5)
+   * Fast Air Quality fetch
    */
   async getAirQuality(lat, lon, timezone = 'auto') {
     const cacheKey = `air_${lat.toFixed(2)}_${lon.toFixed(2)}`;
@@ -134,24 +131,71 @@ export const WeatherAPI = {
   },
 
   /**
-   * Fast location search
+   * Smart Multi-Source Location Search
+   * 1. OpenStreetMap Nominatim / Photon (Korean Dong/Eup/Myeon/Ri level)
+   * 2. Open-Meteo Geocoding (Global major cities)
    */
   async searchLocation(query) {
-    if (!query || query.trim().length < 2) return [];
-    const params = new URLSearchParams({
-      name: query.trim(),
-      count: 8,
-      language: 'ko',
-      format: 'json',
-    });
+    if (!query || query.trim().length < 1) return [];
+    const q = query.trim();
+    const results = [];
+    const seen = new Set();
 
+    // 1. Photon Geocoding (Fast micro-dong and Korean neighborhoods)
     try {
-      const res = await fetch(`${this.GEOCODING_URL}?${params.toString()}`);
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.results || [];
-    } catch (err) {
-      return [];
+      const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8`;
+      const pRes = await fetch(photonUrl);
+      if (pRes.ok) {
+        const pData = await pRes.json();
+        for (const feat of pData.features || []) {
+          const props = feat.properties || {};
+          const [lon, lat] = feat.geometry.coordinates;
+          const key = `${lat.toFixed(3)}_${lon.toFixed(3)}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+
+          const name = props.name || props.district || props.city || q;
+          const subParts = [props.city || props.district, props.state, props.country].filter(Boolean);
+          // filter duplicates in subparts
+          const subText = [...new Set(subParts)].join(' • ');
+
+          results.push({
+            name: name,
+            subText: subText || '대한민국',
+            latitude: lat,
+            longitude: lon,
+            country: props.country || '대한민국',
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Photon 검색 실패:', e);
     }
+
+    // 2. Open-Meteo Global Geocoding
+    try {
+      const omUrl = `${this.GEOCODING_URL}?name=${encodeURIComponent(q)}&count=6&language=ko&format=json`;
+      const omRes = await fetch(omUrl);
+      if (omRes.ok) {
+        const omData = await omRes.json();
+        for (const item of omData.results || []) {
+          const key = `${item.latitude.toFixed(3)}_${item.longitude.toFixed(3)}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+
+          results.push({
+            name: item.name,
+            subText: [item.admin1, item.country].filter(Boolean).join(' • '),
+            latitude: item.latitude,
+            longitude: item.longitude,
+            country: item.country || '',
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Open-Meteo 검색 실패:', e);
+    }
+
+    return results;
   },
 };
